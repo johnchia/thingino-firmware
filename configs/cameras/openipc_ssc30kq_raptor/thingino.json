@@ -1,0 +1,3 @@
+{
+  "_comment": "SSC30KQ board wiring is not mapped yet. GPIO numbers here would be guesses, and a wrong pin number is worse than an absent one: thingino-gpio would drive an unknown line. Populate from the board schematic (or ipctool) during phase 2, when there is hardware to verify against."
+}

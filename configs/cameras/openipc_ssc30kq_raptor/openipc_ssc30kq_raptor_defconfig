@@ -1,0 +1,46 @@
+# NAME: OpenIPC SSC30KQ (Infinity6E, Raptor)
+# FRAG: soc-infinity6e core-sigmastar ssl-mbedtls
+
+# board.mk includes this file as a makefile before thingino.mk runs, so these
+# two are read as plain make variables there and drive SOC_VENDOR/FAMILY/ARCH.
+# They are not Kconfig symbols; olddefconfig drops them from .config, the same
+# way it drops FLASH_SIZE_MB in the Ingenic camera configs.
+BR2_SIGMASTAR_SOC_MODEL="ssc30kq"
+BR2_SIGMASTAR_SOC_FAMILY="infinity6e"
+
+FLASH_SIZE_MB=16
+
+# The toolchain fragment is resolved by name from TYPE/GCC/LIBC only
+# (Makefile:185) and has no architecture in it, so the file that gets appended
+# is always thingino's mipsel toolchain. Re-point it here: the camera defconfig
+# is appended after the fragments (Makefile:591), so these win.
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM=y
+BR2_TOOLCHAIN_EXTERNAL_DOWNLOAD=y
+BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/openipc/firmware/releases/download/toolchain/toolchain.sigmastar-infinity6e.tgz"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX="arm-openipc-linux-gnueabihf"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_GLIBC=y
+BR2_TOOLCHAIN_EXTERNAL_GCC_14=y
+BR2_TOOLCHAIN_EXTERNAL_CXX=y
+# BR2_TOOLCHAIN_EXTERNAL_INET_RPC is not set
+
+# Same reason: Makefile:580-588 appends 3.10 or 4.4 headers unconditionally
+# from the Ingenic KERNEL_VERSION, and runs before this file is appended. The
+# OpenIPC ARM toolchain ships 4.9 headers.
+BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
+BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_4_9=y
+
+# Vendor U-Boot stays on the chip, so there is no uenv.txt and no full-chip
+# image. The kernel and rootfs are flashed to the vendor partition table:
+#
+#   0x000000040000-0x000000050000 : "env"
+#   0x000000050000-0x000000250000 : "kernel"       2048KB
+#   0x000000250000-0x000000750000 : "rootfs"       5120KB
+#   0x000000750000-0x000001000000 : "rootfs_data"  8896KB
+#
+# The 5120KB rootfs cap is the real budget, and it is not derivable from the
+# 16MB flash size. Re-read /proc/mtd on the device before changing this.
+BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/infinity6e/ssc30kq-post-image.sh"
+
+# Phase 1 is "boots to a shell". The camera stack (sigmastar-osdrv-infinity6e,
+# raptor) lands in phase 2, so nothing here touches /dev/mi_* yet.
+BR2_PACKAGE_DROPBEAR=y

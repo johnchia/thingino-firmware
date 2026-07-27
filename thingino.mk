@@ -7,6 +7,29 @@ qstrip ?= $(strip $(subst ",,$(1)))
 
 SOC_VENDOR := ingenic
 
+# SigmaStar (Infinity6E) runs alongside the Ingenic path rather than replacing
+# it. BR2_SIGMASTAR_SOC_MODEL comes from the camera defconfig, which board.mk
+# includes as a makefile before this file. With it unset -- i.e. for every
+# Ingenic camera -- none of this executes and the logic below is unchanged.
+SIGMASTAR_SOC_MODEL_INPUT := $(call qstrip,$(BR2_SIGMASTAR_SOC_MODEL))
+ifneq ($(SIGMASTAR_SOC_MODEL_INPUT),)
+	SOC_VENDOR := sigmastar
+	SOC_MODEL := $(shell echo $(SIGMASTAR_SOC_MODEL_INPUT) | tr A-Z a-z)
+	SOC_FAMILY := $(call qstrip,$(BR2_SIGMASTAR_SOC_FAMILY))
+	# SOC_ARCH selects a board/kernel subdirectory. For Ingenic that is an ISA
+	# (xburst1/xburst2) shared by several families; here the family is the
+	# finest split that exists, so the two coincide.
+	SOC_ARCH := $(SOC_FAMILY)
+	# Only feeds the Ingenic ISP module's rmem/nmem defaults further down, which
+	# this vendor does not load. Confirm against /proc/meminfo on the device
+	# before relying on it for anything else.
+	SOC_RAM_MB := 128
+	# Set here so the Ingenic default chain below (guarded on an empty
+	# KERNEL_VERSION) leaves it alone. The tree is pulled as a tarball, not from
+	# KERNEL_SITE/BRANCH/HASH, so this value only names the output directory.
+	KERNEL_VERSION := 4.9
+endif
+
 # Get SoC model from BR2_INGENIC_SOC_MODEL (single source of truth)
 SOC_MODEL_INPUT := $(call qstrip,$(BR2_INGENIC_SOC_MODEL))
 ifneq ($(SOC_MODEL_INPUT),)
@@ -60,6 +83,12 @@ ifeq ($(KERNEL_VERSION),)
 	endif
 endif
 
+# Guarded rather than reindented, so the Ingenic body below stays byte-for-byte
+# identical to upstream and merges cleanly. SigmaStar pulls its kernel as a
+# tarball (see core-sigmastar.fragment) and needs none of these; leaving the
+# block unguarded would also fire the git ls-remote below on every make.
+ifeq ($(SOC_VENDOR),ingenic)
+
 KERNEL_SITE := https://github.com/gtxaspec/thingino-linux
 
 ifeq ($(KERNEL_VERSION),7.1-rc1)
@@ -107,6 +136,8 @@ ifeq ($(KERNEL_HASH),)
 	KERNEL_HASH := $(shell git ls-remote $(KERNEL_SITE) $(KERNEL_BRANCH) | head -1 | cut -f1)
 endif
 KERNEL_TARBALL_URL := $(KERNEL_SITE)/archive/$(KERNEL_HASH).tar.gz
+
+endif # SOC_VENDOR = ingenic
 
 ifeq ($(KERNEL_VERSION),7.1-rc1)
 KERNEL_VERSION_7 := y
