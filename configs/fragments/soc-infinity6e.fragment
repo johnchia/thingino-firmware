@@ -2,3 +2,8 @@ BR2_arm=y
 BR2_cortex_a7=y
 BR2_ARM_FPU_NEON_VFPV4=y
 BR2_ARM_INSTRUCTIONS_THUMB2=y
+
+# Suppresses the Ingenic-only selects in Config.in (ingenic-sdk, ingenic-pwm,
+# ingenic-diag-tools, ingenic-musl, BR2_TARGET_UBOOT) without disabling
+# BR2_THINGINO_SYSTEM_PACKAGES, which also gates the application layer.
+BR2_SOC_SIGMASTAR=y

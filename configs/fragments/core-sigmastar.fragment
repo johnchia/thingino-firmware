@@ -51,6 +51,9 @@ BR2_LINUX_KERNEL_XZ=y
 # BR2_LINUX_KERNEL_INSTALL_TARGET is not set
 
 BR2_PACKAGE_HOST_MTD=y
+# Provides mkimage for BR2_LINUX_KERNEL_UIMAGE, so the build does not depend on
+# a u-boot-tools package being installed on the host.
+BR2_PACKAGE_HOST_UBOOT_TOOLS=y
 BR2_PACKAGE_BUSYBOX_CONFIG="$(BR2_EXTERNAL_THINGINO_PATH)/package/busybox/busybox.config"
 # BR2_PACKAGE_COREUTILS is not set
 BR2_PACKAGE_OVERRIDE_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/package/thingino-overrides.mk"
@@ -69,6 +72,12 @@ BR2_PACKAGE_THINGINO_DIAG=y
 BR2_PACKAGE_THINGINO_HA=y
 BR2_PACKAGE_THINGINO_SYSTEM=y
 BR2_PACKAGE_THINGINO_SYSUPGRADE=y
+
+# ingenic-sdk carries "default y if !KERNEL_VERSION_7" in its own Config.in,
+# and KERNEL_VERSION_7 is a make variable rather than a Kconfig symbol, so the
+# condition is always true and the package turns itself on regardless of the
+# guard in Config.in. It builds Ingenic kernel modules; it cannot work here.
+# BR2_PACKAGE_INGENIC_SDK is not set
 
 # Omitted on purpose, unlike core.fragment:
 #   BR2_PACKAGE_THINGINO_GPIO / _LEDD / _DAYNIGHT  - Ingenic GPIO register access

@@ -27,7 +27,6 @@ BR2_TOOLCHAIN_EXTERNAL_CXX=y
 # from the Ingenic KERNEL_VERSION, and runs before this file is appended. The
 # OpenIPC ARM toolchain ships 4.9 headers.
 BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
-BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_4_9=y
 
 # Vendor U-Boot stays on the chip, so there is no uenv.txt and no full-chip
 # image. The kernel and rootfs are flashed to the vendor partition table:
@@ -43,4 +42,11 @@ BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/infi
 
 # Phase 1 is "boots to a shell". The camera stack (sigmastar-osdrv-infinity6e,
 # raptor) lands in phase 2, so nothing here touches /dev/mi_* yet.
+#
+# Upstream's streamer choice already defaults to Raptor, but package/
+# thingino-raptor/Config.in hard-selects ingenic-lib, ingenic-lib-libimp and
+# ingenic-system-libs-neo -- upstream's Raptor is still an Ingenic-only
+# package. Guarding those is phase 2 work; until then take no streamer at all
+# rather than drag MIPS vendor blobs into an ARM rootfs.
+BR2_PACKAGE_THINGINO_STREAMER_NONE=y
 BR2_PACKAGE_DROPBEAR=y
