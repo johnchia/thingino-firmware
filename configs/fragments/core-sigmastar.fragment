@@ -51,9 +51,13 @@ BR2_LINUX_KERNEL_XZ=y
 # BR2_LINUX_KERNEL_INSTALL_TARGET is not set
 
 BR2_PACKAGE_HOST_MTD=y
-# Provides mkimage for BR2_LINUX_KERNEL_UIMAGE, so the build does not depend on
-# a u-boot-tools package being installed on the host.
-BR2_PACKAGE_HOST_UBOOT_TOOLS=y
+# Host tools come from the distro where possible rather than being rebuilt, so
+# BR2_PACKAGE_HOST_UBOOT_TOOLS is not selected here. Note that does not avoid
+# the build: buildroot/linux/Config.in:252 hard-selects it from
+# BR2_LINUX_KERNEL_UIMAGE, so any uImage target builds mkimage from source
+# whatever this file says. Listing it here as well would only make it look
+# like our choice. Dropping it would mean giving up uImage, which vendor
+# U-Boot needs.
 BR2_PACKAGE_BUSYBOX_CONFIG="$(BR2_EXTERNAL_THINGINO_PATH)/package/busybox/busybox.config"
 # BR2_PACKAGE_COREUTILS is not set
 BR2_PACKAGE_OVERRIDE_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/package/thingino-overrides.mk"
