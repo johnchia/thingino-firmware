@@ -1,11 +1,19 @@
 #!/bin/sh
 #
-# Check the built images against the SSC30KQ's *actual* vendor partition table.
+# Check the built images against the SSC30KQ's *actual* vendor partition table,
+# as read from /proc/mtd on the device:
 #
-#   0x000000040000-0x000000050000 : "env"
-#   0x000000050000-0x000000250000 : "kernel"       2048KB
-#   0x000000250000-0x000000750000 : "rootfs"       5120KB
-#   0x000000750000-0x000001000000 : "rootfs_data"  8896KB
+#   dev:    size      erasesize  name
+#   mtd0: 00040000  00010000  "boot"          256KB
+#   mtd1: 00010000  00010000  "env"            64KB
+#   mtd2: 00200000  00010000  "kernel"       2048KB   <- uImage goes here
+#   mtd3: 00500000  00010000  "rootfs"       5120KB   <- rootfs.squashfs here
+#   mtd4: 008b0000  00010000  "rootfs_data"  8896KB   <- jffs2 overlay upperdir
+#
+# The limits below are mtd2 and mtd3. Note the partition table itself comes from
+# the U-Boot bootargs (CONFIG_MTD_CMDLINE_PARTS=y, CONFIG_MTD_OF_PARTS unset),
+# not from the device tree, so it is vendor U-Boot that decides these -- another
+# reason to leave the U-Boot env alone.
 #
 # The version carried over from OpenIPC checked rootfs against a flat 8MB and
 # did not check the kernel at all. Neither is right for this board: the chip is
