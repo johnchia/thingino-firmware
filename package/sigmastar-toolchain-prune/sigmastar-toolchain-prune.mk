@@ -27,10 +27,29 @@
 # Each library is pruned ONLY when Buildroot is configured to build its own.
 # That matters in both directions:
 #
-#   - Pruning unconditionally would delete libraries nothing replaces. Buildroot
-#     currently builds only mbedtls and libcurl; zlib, json-c, libevent, opus,
-#     ogg, yaml and libubox are not selected, so the toolchain's copies are the
-#     only ones there and are legitimately linked against.
+#   - Pruning unconditionally would delete libraries nothing replaces, and the
+#     build would then fail to link.
+#
+#     An earlier version of this comment went further and called the unreplaced
+#     toolchain copies "legitimately linked against". That was wrong, and it hid
+#     a whole class of bug. Linking against them succeeds; SHIPPING them does
+#     not happen. Buildroot's toolchain-external copies only a fixed set of
+#     runtime libraries into the target -- libc, libm, libgcc_s, libstdc++ and
+#     friends -- and never the extra libraries a vendor sysroot happens to
+#     bundle. So a package that links the toolchain's libz gets DT_NEEDED
+#     libz.so.1 and no libz.so.1 in the rootfs, and fails at exec time with
+#     nothing in the build log.
+#
+#     That is what happened to /usr/bin/curl and, through libcurl, to
+#     telegrambot. The rule is: every bundled library that anything links must
+#     either be built by Buildroot (then pruned here) or named in
+#     BR2_TOOLCHAIN_EXTRA_LIBS so it is copied to the target. Leaving it to the
+#     toolchain alone is never correct.
+#
+#     Check with: for every ELF in $(TARGET_DIR), confirm each DT_NEEDED
+#     resolves under target/lib or target/usr/lib. That audit is what found
+#     libz after uhttpd's libjson-c; it takes seconds and catches the class
+#     rather than one instance.
 #   - Pruning conditionally keeps working as the config grows. Phase 2 turns on
 #     Raptor, which wants opus and ogg; the moment Buildroot builds them, the
 #     stale bundled copies start being removed without anyone remembering to
@@ -66,8 +85,27 @@ SIGMASTAR_TOOLCHAIN_PRUNE_INCLUDES += zlib.h zconf.h
 SIGMASTAR_TOOLCHAIN_PRUNE_PC += zlib
 endif
 
-ifeq ($(BR2_PACKAGE_JSON_C),y)
-SIGMASTAR_TOOLCHAIN_PRUNE_LIBS += libjson-c
+# Two packages can be the json-c provider, and thingino's default is the second.
+#
+# thingino-jct is a drop-in replacement: it builds libjct.so.1.0.0 and then
+# symlinks libjson-c.so, libjson.so, libjson-c.a and libjson.a onto it in both
+# staging and target, so `-ljson-c` resolves to a library whose SONAME is
+# libjct.so.1. Nothing on a thingino image ships a libjson-c.so.5 at all.
+#
+# Gating this block on BR2_PACKAGE_JSON_C alone therefore never fired here, and
+# the toolchain's own libjson-c.so -> libjson-c.so.5 survived into staging and
+# overwrote jct's symlink of the same name. uhttpd and jshn linked against it
+# and came out NEEDING libjson-c.so.5, which does not exist on the target:
+#
+#   /etc/init.d/S60uhttpd start
+#   SSL startup failed, falling back to HTTP-only...
+#   FAIL
+#
+# The loader failure is silent from the init script's point of view -- it only
+# checks pgrep and netstat, so a binary that cannot resolve its DT_NEEDED looks
+# identical to one that started and refused to listen.
+ifneq ($(BR2_PACKAGE_JSON_C)$(BR2_PACKAGE_THINGINO_JCT),)
+SIGMASTAR_TOOLCHAIN_PRUNE_LIBS += libjson-c libjson
 SIGMASTAR_TOOLCHAIN_PRUNE_INCLUDES += json-c
 SIGMASTAR_TOOLCHAIN_PRUNE_PC += json-c
 endif

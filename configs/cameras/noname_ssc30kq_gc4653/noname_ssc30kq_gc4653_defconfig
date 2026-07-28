@@ -237,3 +237,23 @@ BR2_PACKAGE_THINGINO_RAPTOR_CONF_RING_REFMODE_FALSE=y
 # deliberate adjustment, counterproductive as a default.
 
 BR2_PACKAGE_DROPBEAR=y
+
+# Build zlib for the target rather than linking the toolchain's bundled copy.
+#
+# The OpenIPC toolchain sysroot ships libz.so.1.3.1, so -lz resolves at link
+# time and libcurl comes out with DT_NEEDED libz.so.1. But Buildroot's
+# toolchain-external only copies a fixed set of runtime libraries into the
+# target (libc, libm, libgcc_s, libstdc++ ...) -- it does not ship arbitrary
+# libraries bundled in a vendor sysroot. So libz.so.1 was never in the rootfs
+# and /usr/bin/curl could not start. telegrambot reaches it through libcurl and
+# broke the same way.
+#
+# Selecting it here makes Buildroot build and install a real target zlib, and
+# turns on the libz block that sigmastar-toolchain-prune already had waiting, so
+# the toolchain's copy stops shadowing it in staging.
+#
+# BR2_TOOLCHAIN_EXTRA_LIBS="libz" would also have worked -- that is Buildroot's
+# supported hook for this exact toolchain shape (pkg-toolchain-external.mk:176)
+# -- but it would ship a prebuilt blob that the prune is simultaneously trying
+# to delete. Building it is the option that keeps one owner per library.
+BR2_PACKAGE_ZLIB=y
