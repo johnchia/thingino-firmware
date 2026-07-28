@@ -1,19 +1,36 @@
 #!/bin/sh
 #
-# Check the built images against the SSC30KQ's *actual* vendor partition table,
-# as read from /proc/mtd on the device:
+# Check the built images against the SSC30KQ's vendor partition table.
 #
-#   dev:    size      erasesize  name
-#   mtd0: 00040000  00010000  "boot"          256KB
-#   mtd1: 00010000  00010000  "env"            64KB
-#   mtd2: 00200000  00010000  "kernel"       2048KB   <- uImage goes here
-#   mtd3: 00500000  00010000  "rootfs"       5120KB   <- rootfs.squashfs here
-#   mtd4: 008b0000  00010000  "rootfs_data"  8896KB   <- jffs2 overlay upperdir
+# The table comes from the U-Boot bootargs (CONFIG_MTD_CMDLINE_PARTS=y,
+# CONFIG_MTD_OF_PARTS unset), not from the device tree:
 #
-# The limits below are mtd2 and mtd3. Note the partition table itself comes from
-# the U-Boot bootargs (CONFIG_MTD_CMDLINE_PARTS=y, CONFIG_MTD_OF_PARTS unset),
-# not from the device tree, so it is vendor U-Boot that decides these -- another
-# reason to leave the U-Boot env alone.
+#   mtdparts=NOR_FLASH:256k(boot),64k(env),2048k(kernel),${rootmtd}(rootfs),-(rootfs_data)
+#
+# Note ${rootmtd}: the rootfs size is a U-Boot *variable*, not a literal, and
+# rootfs_data is the "-" catch-all that absorbs whatever is left. So this layout
+# is retuned by `fw_setenv rootmtd <size>` alone -- no bootargs edit, and the
+# kernel load path (bootcmd's ${kernaddr}/${kernsize}) is never touched.
+#
+# rootmtd is 8192k, giving:
+#
+#   mtd0  "boot"          256KB
+#   mtd1  "env"            64KB
+#   mtd2  "kernel"       2048KB   <- uImage goes here
+#   mtd3  "rootfs"       8192KB   <- rootfs.squashfs here
+#   mtd4  "rootfs_data"  5824KB   <- jffs2 overlay upperdir, the "-" remainder
+#
+# Two traps this has already sprung:
+#
+#   - /proc/cmdline is the expansion from the last boot and does not track later
+#     fw_setenv changes. It read 5120k while the env already said 8192k. Trust
+#     `fw_printenv rootmtd`, not /proc/cmdline, and remember /proc/mtd only
+#     catches up after a reboot.
+#   - `rootsize` (0x500000) is a separate variable used by urwrite for TFTP
+#     rootfs writes. It does not follow rootmtd. If rootmtd changes, rootsize
+#     has to be changed with it or a TFTP write erases the wrong length.
+#
+# Re-read `fw_printenv rootmtd` before changing ROOTFS_LIMIT below.
 #
 # The version carried over from OpenIPC checked rootfs against a flat 8MB and
 # did not check the kernel at all. Neither is right for this board: the chip is
@@ -30,7 +47,7 @@ BINARIES_DIR="$1"
 IMAGE_NAME="ssc30kq_${OPENIPC_VARIANT:-image}"
 
 KERNEL_LIMIT=$((2048 * 1024))
-ROOTFS_LIMIT=$((5120 * 1024))
+ROOTFS_LIMIT=$((8192 * 1024))
 
 rc=0
 

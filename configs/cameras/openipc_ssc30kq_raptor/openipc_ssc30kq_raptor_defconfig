@@ -45,9 +45,22 @@ BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
 #                        mtd2. Confirm indices from /proc/mtd, not from here.
 #   mtdparts=...       - the partition table comes from the cmdline, not the
 #                        device tree (CONFIG_MTD_CMDLINE_PARTS=y,
-#                        CONFIG_MTD_OF_PARTS unset). The 5120KB rootfs cap the
-#                        post-image script enforces is this, and it is not
-#                        derivable from the 16MB flash size.
+#                        CONFIG_MTD_OF_PARTS unset), and it is not derivable
+#                        from the 16MB flash size.
+#
+# The line above is the *expansion* from one particular boot. The env holds it
+# with the rootfs size as a variable:
+#
+#   mtdparts=NOR_FLASH:256k(boot),64k(env),2048k(kernel),${rootmtd}(rootfs),-(rootfs_data)
+#
+# so the layout retunes with `fw_setenv rootmtd <size>` and a reboot, with no
+# bootargs edit. rootmtd is 8192k: rootfs 8192KB, rootfs_data 5824KB (the "-"
+# remainder). The vendor default of 5120k is too small -- phase 2's osdrv
+# payload alone lands the image near 98% of it.
+#
+# /proc/cmdline does NOT track later fw_setenv changes; it is frozen at boot.
+# It read 5120k on this board while the env already said 8192k. Trust
+# `fw_printenv rootmtd`.
 #   console=ttyS0      - inittab respawns getty on /dev/console, which resolves
 #                        through this.
 #
