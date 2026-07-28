@@ -1,0 +1,43 @@
+From: thingino sigmastar port
+Subject: [PATCH] assembly.h: use the portable C path on ARM
+
+assembly.h picks an implementation of MULSHIFT32/FASTABS/CLZ per platform and
+ends in "#error Unsupported platform in assembly.h". Both ARM branches are
+disabled upstream by deliberately misspelt guards:
+
+    #elif defined (XXX__arm) && defined (__ARMCC_VERSION)
+    #elif defined(__GNUC__) && defined(XXXX__arm__)
+
+so an ARM GCC build matches nothing and hits the #error. The portable C branch
+just below covers ARDUINO, mips, powerpc and Solaris but not arm.
+
+This is not a compile-time failure in practice, which is what makes it nasty.
+libhelix-aac.mk compiles the sources with a $(foreach ...) loop whose commands
+are joined by ";", so a file that fails to compile does not stop the loop, and
+the final link is "-shared" over whatever .o files exist -- which permits
+undefined symbols. The result on ARM was 13 objects out of 28 sources and a
+libhelix-aac.so that loads and then dies on first use:
+
+    rwd: symbol lookup error: /lib/libhelix-aac.so: undefined symbol: UncoupleSBRNoise
+
+(UncoupleSBRNoise lives in sbrhuff.c, one of the 15 that never compiled. All 15
+include assembly.h; the 13 that built do not.)
+
+Add __arm__/__aarch64__ to the portable branch. That is exactly the path MIPS
+already takes, so this is the code thingino has been shipping on Ingenic all
+along -- plain C, no inline assembly, no new risk. Reviving the disabled ARM
+assembly branch would be the other option, but it is disabled upstream for a
+reason nobody has written down, and correctness beats a guess at speed for an
+AAC decoder used by the WebRTC audio path.
+
+--- a/src/libhelix-aac/assembly.h
++++ b/src/libhelix-aac/assembly.h
+@@ -533,7 +533,7 @@ static __inline Word64 MADD64(Word64 sum64, int x, int y) {
+     return sum64;
+ }
+ 
+-#elif defined(ARDUINO) || defined(__GNUC__) && (defined(__mips__) || defined(__MIPS__)) || defined(__GNUC__) && (defined(__powerpc__) || defined(__POWERPC__)) || (defined (_SOLARIS) && !defined (__GNUC__) && !defined (_SOLARISX86))
++#elif defined(ARDUINO) || defined(__GNUC__) && (defined(__mips__) || defined(__MIPS__)) || defined(__GNUC__) && (defined(__arm__) || defined(__aarch64__)) || defined(__GNUC__) && (defined(__powerpc__) || defined(__POWERPC__)) || (defined (_SOLARIS) && !defined (__GNUC__) && !defined (_SOLARISX86))
+ 
+ typedef long long Word64;
+ 
