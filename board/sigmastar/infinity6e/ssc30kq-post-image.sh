@@ -12,13 +12,26 @@
 # is retuned by `fw_setenv rootmtd <size>` alone -- no bootargs edit, and the
 # kernel load path (bootcmd's ${kernaddr}/${kernsize}) is never touched.
 #
-# rootmtd is 8192k, giving:
+# The catch: fw_setenv rootmtd does NOT currently reach U-Boot on this board.
+# The stored env reads 8192k and has on both units tested, yet /proc/cmdline
+# expands to 5120k after a reboot -- while other fw_setenv writes in the same
+# session (bootdelay, rootsize, sysupgrade_complete) persist fine in what
+# fw_printenv reads back. So userspace is self-consistent but U-Boot is reading
+# its environment from somewhere fw_env.config does not point at. Two different
+# units behave identically, so this is a platform property, not corruption.
+#
+# Until that is understood, the effective layout remains the vendor's:
 #
 #   mtd0  "boot"          256KB
 #   mtd1  "env"            64KB
 #   mtd2  "kernel"       2048KB   <- uImage goes here
-#   mtd3  "rootfs"       8192KB   <- rootfs.squashfs here
-#   mtd4  "rootfs_data"  5824KB   <- jffs2 overlay upperdir, the "-" remainder
+#   mtd3  "rootfs"       5120KB   <- rootfs.squashfs here
+#   mtd4  "rootfs_data"  8896KB   <- jffs2 overlay upperdir, the "-" remainder
+#
+# ROOTFS_LIMIT is 5120k to match. Raising it to 8192k on the strength of the
+# stored env would let a build pass here and then fail to flash, which is the
+# exact failure this script exists to prevent. Raise it only once /proc/cmdline
+# on a booted device actually shows 8192k.
 #
 # Two traps this has already sprung:
 #
@@ -47,7 +60,7 @@ BINARIES_DIR="$1"
 IMAGE_NAME="ssc30kq_${OPENIPC_VARIANT:-image}"
 
 KERNEL_LIMIT=$((2048 * 1024))
-ROOTFS_LIMIT=$((8192 * 1024))
+ROOTFS_LIMIT=$((5120 * 1024))
 
 rc=0
 

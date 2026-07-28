@@ -1,4 +1,21 @@
-# NAME: OpenIPC SSC30KQ (Infinity6E, Raptor)
+# NAME: Unbranded SSC30KQ (Infinity6E, GC4653)
+#
+# Named per thingino's convention <brand>_[model_]<soc>_<sensor>[_<wifi>], where
+# the wifi field is optional (cf. hamedal_c20_t31a_gc2053) and the model field
+# may be omitted for unbranded hardware (cf. noname_t10l_jxh42_mt7601). "noname"
+# is thingino's established token for unbranded boards.
+#
+# Was openipc_ssc30kq_raptor, which was wrong twice over: it put "openipc" in
+# the brand slot, when OpenIPC is the firmware being replaced rather than the
+# hardware vendor, and "raptor" in the sensor slot, when raptor is a streamer
+# and not silicon. It also leaked into the hostname -- scripts/rootfs_script.sh
+# builds it from the first two underscore fields, giving ing-openipc-ssc30kq.
+# This name gives ing-noname-ssc30kq.
+#
+# Note the sensor belongs in the target name because thingino ships one target
+# per silicon combination (cf. the eight tplink_tapo variants). That is a
+# *naming* convention only: this target still installs all six Infinity6E sensor
+# configs and autodetects at runtime, so one image runs on any SSC30KQ board.
 # FRAG: soc-infinity6e core-sigmastar ssl-mbedtls
 
 # board.mk includes this file as a makefile before thingino.mk runs, so these
