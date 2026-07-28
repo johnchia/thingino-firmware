@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# SigmaStar version of thingino-webui's image.raw.
+#
+# The stock handler dumps a raw Bayer frame by poking Ingenic's ISP debug hook:
+#
+#   echo snapraw 0 > /proc/jz/isp/isp-w02
+#   echo saveraw 1 > /proc/jz/isp/isp-w02
+#   cat /tmp/snap0.raw
+#
+# Infinity6E has no /proc/jz/isp, so both writes fail and the `cat` finds no
+# file -- but the octet-stream headers have already been sent by then, so the
+# browser is handed a 0-byte file named preview-<epoch>.raw and the failure
+# looks like a corrupt download rather than an unsupported feature.
+#
+# Say so instead. Status comes first, before any body, so uhttpd reports a real
+# 501 rather than a truncated 200.
+#
+# This is not a stub for something half-finished: raw Bayer capture on this
+# platform would need an MI_VIF raw-dump path through the HAL, which does not
+# exist and is not planned. If it is ever added, replace this file rather than
+# restoring the stock one.
+
+printf 'Status: 501 Not Implemented\r\n'
+printf 'Content-Type: text/plain\r\n'
+printf 'Cache-Control: no-store\r\n'
+printf '\r\n'
+
+echo "Raw sensor capture is not available on this camera."
+echo
+echo "The stock handler drives Ingenic's /proc/jz/isp/isp-w02 snapraw/saveraw"
+echo "hook. This is a SigmaStar Infinity6E (SSC30KQ), which provides no"
+echo "equivalent, so there is nothing to capture from."
+echo
+echo "JPEG snapshots are unaffected -- those come from the streamer, not the"
+echo "ISP debug interface."
+
+exit 0

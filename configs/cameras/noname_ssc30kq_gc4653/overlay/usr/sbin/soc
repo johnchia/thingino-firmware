@@ -1,0 +1,116 @@
+#!/bin/sh
+#
+# SigmaStar replacement for thingino-system's `soc`.
+#
+# The stock helper reads Ingenic identification registers with devmem
+# (0x1300002C, 0x13540231, 0x13540238, 0x13540250, 0x1354021C and four serial
+# words at 0x135402xx). None of those addresses is inside the Infinity6E RIU
+# window, so on this SoC every one of them takes an external abort:
+#
+#   Unhandled fault: external abort on non-linefetch (0x008) at 0xb6eb8200
+#
+# That is the source of the unhandled faults seen once per caller per boot --
+# S04hostname, S48webui-config and S96onvif_discovery each invoke it. The reads
+# do not merely fail, they fault, and STRICT_DEVMEM is off so nothing stops them.
+#
+# This replacement uses no devmem at all. Everything it reports comes from
+# /etc/os-release (stamped at build time by scripts/rootfs_script.sh), from
+# procfs, or from ipcinfo.
+#
+# Camera overlay rather than a package: Makefile:598 appends the camera overlay
+# to BR2_ROOTFS_OVERLAY, and overlays are applied at buildroot/Makefile:809 --
+# after the per-package rsync at :758 and after TARGET_FINALIZE_HOOKS at :759.
+# So this reliably wins over thingino-system's copy. Installing it from a
+# package instead would put it into the same last-writer-wins race that dropped
+# the agent block from /etc/thingino.json, and thingino-system sorts after
+# sigmastar-*, so it would lose.
+#
+# Promote this to a shared SigmaStar overlay when a second SigmaStar board
+# exists. Only the model constant below is board-specific.
+
+# Overridable so the parsing can be exercised off-target.
+OS_RELEASE="${OS_RELEASE:-/etc/os-release}"
+
+os_release_value() {
+	[ -r "$OS_RELEASE" ] || return 0
+	sed -rn "s/^$1=\"?([^\"]*)\"?$/\1/p" "$OS_RELEASE" | head -n1
+}
+
+# ipcinfo -c cannot supply this: sstar_detect_cpu() maps both INFINITY6B and
+# INFINITY6E to the string "SSC33X" (ipctool src/hal/sstar.c), so it is a
+# generation, not a model. This overlay is board-scoped by construction, so the
+# model is stated here.
+print_soc_model() {
+	echo "ssc30kq"
+}
+
+# Build-stamped, so it tracks the defconfig rather than being repeated here.
+print_soc_family() {
+	family=$(os_release_value SOC)
+	[ -n "$family" ] || family="infinity6e"
+	echo "$family"
+}
+
+print_soc_architecture() {
+	arch=$(os_release_value ARCHITECTURE)
+	[ -n "$arch" ] || arch=$(uname -m)
+	echo "$arch"
+}
+
+print_soc_clocks() {
+	freq=""
+	for f in /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq \
+		/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq; do
+		[ -r "$f" ] && freq=$(cat "$f" 2>/dev/null) && break
+	done
+	if [ -n "$freq" ]; then
+		echo "CPU Speed: $((freq / 1000)) MHz"
+	else
+		# No cpufreq driver on this kernel. Say so rather than printing a
+		# guess -- a wrong clock is worse than an absent one.
+		echo "CPU Speed: unknown"
+	fi
+}
+
+# The stock helper concatenates four Ingenic efuse words here. Infinity6E does
+# have a die ID (ipctool's sstar_get_die_id reads it at CHIP_ADDR1), but ipcinfo
+# exposes no flag for it -- only -c, -s and -t -- so there is no devmem-free way
+# to reach it from a script.
+#
+# Print nothing and succeed. Every caller already has a fallback chain:
+# S04hostname:76 falls through to wlan.mac, then ethaddr, then the eth0/wlan0
+# sysfs address, which is what produces the correct hostname on this board
+# today. Emitting a fabricated or constant serial would silently break that
+# chain by satisfying it with a value that is not unique.
+print_serial_number() {
+	:
+}
+
+print_wiki_line() {
+	printf '%s\t%s\t%s\n' "$(print_soc_model)" "$(print_soc_family)" \
+		"$(print_soc_architecture)"
+}
+
+show_usage() {
+	echo "Usage: $0 [-c|-f|-m|-w|-a|-s]
+	-m	SoC model
+	-f	SoC family
+	-w	raw info for wiki
+	-a	CPU architecture
+	-c	CPU Clocks
+	-s	Serial number (unavailable on SigmaStar, prints nothing)
+" >&2
+}
+
+case "$1" in
+	-c) print_soc_clocks ;;
+	-f) print_soc_family ;;
+	-m) print_soc_model ;;
+	-w) print_wiki_line ;;
+	-a) print_soc_architecture ;;
+	-s) print_serial_number ;;
+	"") print_soc_model ;;
+	*) show_usage ;;
+esac
+
+exit 0

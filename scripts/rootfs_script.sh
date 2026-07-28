@@ -45,6 +45,20 @@ else
 	TOOLCHAIN_TYPE="unknown"
 fi
 
+# Derived rather than hardcoded: this was a literal ARCHITECTURE=mips below,
+# which is right for Ingenic and wrong for any other target. /etc/os-release is
+# read at runtime -- `soc -a` reports from it and the web UI displays it -- so on
+# an ARM board it was reporting mips.
+if grep -q "^BR2_arm=y\|^BR2_armeb=y" "$BR2_CONFIG"; then
+	ARCHITECTURE="arm"
+elif grep -q "^BR2_aarch64=y\|^BR2_aarch64_be=y" "$BR2_CONFIG"; then
+	ARCHITECTURE="aarch64"
+elif grep -q "^BR2_mips=y\|^BR2_mipsel=y\|^BR2_mips64=y\|^BR2_mips64el=y" "$BR2_CONFIG"; then
+	ARCHITECTURE="mips"
+else
+	ARCHITECTURE="unknown"
+fi
+
 TOOLCHAIN_GCC=$(sed -rn 's/^BR2_GCC_VERSION="([^"]+)"/\1/p' "$BR2_CONFIG" | tail -n1)
 if [ -z "$TOOLCHAIN_GCC" ]; then
 	TOOLCHAIN_GCC=$(sed -rn 's/^BR2_TOOLCHAIN_(EXTERNAL|BUILDROOT)_GCC_([0-9]+)=y$/\2/p' "$BR2_CONFIG" | tail -n1)
@@ -81,7 +95,7 @@ CPE_NAME=\"cpe:/o:thinginoproject:thingino:1\"
 LOGO=thingino-logo-icon
 ANSI_COLOR=\"1;34\"
 HOME_URL=\"https://thingino.com/\"
-ARCHITECTURE=mips
+ARCHITECTURE=${ARCHITECTURE}
 LIBC=${LIBC}
 TOOLCHAIN=${LIBC}
 TOOLCHAIN_TYPE=${TOOLCHAIN_TYPE}
