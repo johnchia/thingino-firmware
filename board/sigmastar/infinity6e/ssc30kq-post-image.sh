@@ -31,9 +31,26 @@
 # a first boot with a larger image persisted it once and nothing rewrote it.)
 #
 # So the rootfs partition auto-sizes to the image, and the limit is a function
-# of the image rather than a constant. The threshold sits just below 5120k, so
-# there is no gap to fall into: an image that outgrows the 5120KB partition gets
-# the 8192KB one automatically.
+# of the image rather than a constant.
+#
+# THE AUTO-SIZING IS RETROSPECTIVE, NOT PROSPECTIVE, and an earlier version of
+# this comment got that wrong. `sf probe` sizes the partition from the squashfs
+# superblock ALREADY IN FLASH -- it describes the image that is there, not the
+# one you are about to write. So the first image to cross the threshold cannot
+# simply be flashed: mtd3 is still 5120k at that moment and flashcp refuses it
+# with "rootfs.squashfs bigger than /dev/mtd3". The growth is a one-time
+# bootstrap, paid once per unit:
+#
+#   dd if=rootfs.squashfs of=/dev/mtdblock3 bs=4096 count=1280
+#   dd if=rootfs.squashfs of=/dev/mtdblock4 bs=4096 skip=1280
+#
+# i.e. split the write across mtd3 and mtd4 at the old 5120k boundary, since
+# the two are contiguous in flash. The next boot's `sf probe` then reads the
+# superblock of the now-complete image, sets rootmtd=8192k, and every later
+# flash is a plain `flashcp -v rootfs.squashfs /dev/mtd3`.
+#
+# Erase mtd4 only AFTER that resize boot -- its offset moves when rootfs grows,
+# so erasing first erases the wrong region.
 #
 #   mtd0  "boot"          256KB
 #   mtd1  "env"            64KB

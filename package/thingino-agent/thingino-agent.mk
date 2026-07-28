@@ -40,3 +40,39 @@ define THINGINO_AGENT_INSTALL_TARGET_CMDS
 endef
 
 $(eval $(generic-package))
+
+# /etc/thingino.json has three independent authors: thingino-core INSTALLs it
+# from configs/common.thingino.json, then thingino-agent and thingino-ha each
+# `jct import` their own top-level block into it.
+#
+# Under per-package directories every one of those writes lands in that
+# package's PRIVATE target dir, and buildroot/Makefile:758 assembles the real
+# tree with
+#
+#     $(call per-package-rsync,$(sort $(PACKAGES)),target,$(TARGET_DIR),copy)
+#
+# That is a plain file copy in ALPHABETICAL package order, not a JSON merge, so
+# exactly one author's copy survives. thingino-agent sorts before thingino-ha,
+# so the agent block loses every time -- deterministically, on every build, not
+# by luck of the dependency graph. The symptom is silent: the build is green,
+# /etc/thingino.json looks well-formed, and S95thingino-agent reads
+# agent.enabled as empty and logs "Disabled in /etc/thingino.json" while the
+# listener never starts.
+#
+# TARGET_FINALIZE_HOOKS run at buildroot/Makefile:759, immediately after that
+# rsync, which is the first and only point at which the assembled file exists.
+# Re-import the same fragment there. `jct import` merges rather than replaces
+# and is idempotent, so this stays a no-op if upstream ever gives the file a
+# single owner.
+#
+# Scope note: thingino-core and thingino-button lose the same race, and
+# thingino-uboot would outrank thingino-ha if it were built. Only the agent is
+# fixed here because only the agent's loss is load-bearing for this board --
+# core's content survives via ha's copy, and neither button nor uboot is built.
+ifeq ($(BR2_PACKAGE_THINGINO_AGENT),y)
+define THINGINO_AGENT_REIMPORT_CONFIG
+	$(HOST_DIR)/bin/jct $(TARGET_DIR)/etc/thingino.json import \
+		$(THINGINO_AGENT_PKGDIR)/files/thingino-agent.json
+endef
+TARGET_FINALIZE_HOOKS += THINGINO_AGENT_REIMPORT_CONFIG
+endif
