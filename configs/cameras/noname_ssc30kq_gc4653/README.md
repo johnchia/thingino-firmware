@@ -63,3 +63,28 @@ problem (`package/timps/files/www/x/ch0.jpg`): one script installed under every
 name the UI hardcodes, with channel and disposition derived from the name.
 
 Retire it if that deferred item ever lands.
+
+### Known broken, deferred
+
+Verified on hardware 2026-07-28: `/x/ch0.jpg` and `/x/ch0.mjpg` work.
+
+**Stream 1 produces no JPEG.** `/snap?stream=1` fails on rhd directly, and
+`/x/ch1.jpg` / `/x/ch1.mjpg` fail because the proxy faithfully relays that.
+Stream 0 works by every route. One fault, in raptor, not in the web layer —
+this CGI is only the messenger.
+
+Where to look: stream 1 is 640x360 @ 5 fps with `jpeg = true`, so this board
+wants four VPE ports (2 video + 2 JPEG) and `STAR_VPE_PORT_NUM` is exactly 4.
+The snapshot-port fix (raptor-hal `7a23962`) was only ever confirmed on stream
+0, and its dedicated-port design is the part most likely to run out of room or
+mis-clone geometry for the second JPEG channel.
+
+```
+logread | grep -e 'bind: VPE port' -e 'snapshot channel attached'
+```
+
+Expect four binds and two `snapshot channel attached` lines; a missing fourth
+bind or a second attach that never appears localises it immediately. Hand the
+result to the raptor agent rather than working around it here.
+
+Deferred — does not block the UI.
