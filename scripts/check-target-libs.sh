@@ -54,10 +54,18 @@ declare -A users
 # associative array is an unbound-variable error in bash < 4.4, which made the
 # success path exit 0 after printing an error -- the worst outcome for a CI gate.
 missing=0
+# Also counted separately, for the same reason: a gate that inspects nothing
+# must not report success. Pointing this script at the *output* directory
+# instead of its target/ subdirectory finds no ELFs, resolves no DT_NEEDED and
+# prints OK -- and the second pass derives per-package from $TARGET's parent, so
+# it silently finds no tree either and prints its own OK. Two green lines, zero
+# bytes examined.
+scanned=0
 
 while IFS= read -r f; do
 	# Cheap ELF test: avoids running readelf on every script and data file.
 	[ "$(head -c4 "$f" 2>/dev/null | tr -d '\0')" = $'\x7fELF' ] || continue
+	scanned=$((scanned + 1))
 	while IFS= read -r need; do
 		[ -n "$need" ] || continue
 		found=
@@ -71,8 +79,14 @@ while IFS= read -r f; do
 	done < <("$READELF" -d "$f" 2>/dev/null | sed -rn 's/.*\(NEEDED\).*\[(.*)\]/\1/p')
 done < <(find $SEARCH -type f 2>/dev/null)
 
+if [ "$scanned" -eq 0 ]; then
+	echo "$0: no ELF files under $TARGET -- is that a target directory?" >&2
+	echo "    expected something like output/<board>/<config>/target" >&2
+	exit 2
+fi
+
 if [ "$missing" -eq 0 ]; then
-	echo "check-target-libs: OK -- every DT_NEEDED resolves inside the target"
+	echo "check-target-libs: OK -- $scanned ELF files, every DT_NEEDED resolves inside the target"
 else
 	for lib in "${!users[@]}"; do
 		echo "check-target-libs: MISSING $lib"
@@ -158,6 +172,11 @@ if [ -d "$PPD" ]; then
 	else
 		echo "check-target-libs: OK -- per-package library copies all agree"
 	fi
+else
+	# Not fatal -- a build without BR2_PER_PACKAGE_DIRECTORIES has no such tree
+	# and nothing to disagree. Say so rather than printing nothing, so a silent
+	# skip is never mistaken for a pass.
+	echo "check-target-libs: SKIP -- no $PPD, second pass not run"
 fi
 
 exit $rc
