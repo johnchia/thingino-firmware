@@ -64,34 +64,80 @@ BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
 #                        device tree (CONFIG_MTD_CMDLINE_PARTS=y,
 #                        CONFIG_MTD_OF_PARTS unset), and it is not derivable
 #                        from the 16MB flash size.
+#   console=ttyS0      - inittab respawns getty on /dev/console, which resolves
+#                        through this.
 #
-# The line above is the *expansion* from one particular boot. The env holds it
-# with the rootfs size as a variable:
+# The line above is the *expansion* from one particular boot. The env holds the
+# rootfs size as a variable:
 #
 #   mtdparts=NOR_FLASH:256k(boot),64k(env),2048k(kernel),${rootmtd}(rootfs),-(rootfs_data)
 #
-# so the layout retunes with `fw_setenv rootmtd <size>` and a reboot, with no
-# bootargs edit. rootmtd is 8192k: rootfs 8192KB, rootfs_data 5824KB (the "-"
-# remainder). The vendor default of 5120k is too small -- phase 2's osdrv
-# payload alone lands the image near 98% of it.
+# but ${rootmtd} is not read from the stored environment and cannot be set.
+# OpenIPC's U-Boot re-derives it on every boot in cmd_sf.c's `sf probe`, from
+# the squashfs superblock at the rootfs offset: under ~4.996MB it picks 5120k,
+# over it 8192k. bootcmd runs `sf probe 0` before ${rootmtd} is expanded, so
+# `fw_setenv rootmtd` can never take effect on any unit, and a stored 8192k is
+# a fossil from a first boot that ran `sf probe 0; saveenv`.
 #
-# /proc/cmdline does NOT track later fw_setenv changes; it is frozen at boot.
-# It read 5120k on this board while the env already said 8192k. Trust
-# `fw_printenv rootmtd`.
-#   console=ttyS0      - inittab respawns getty on /dev/console, which resolves
-#                        through this.
+# So the partition auto-sizes to the image and needs no management here. Phase
+# 2's osdrv payload pushes the image past the threshold; it gets the 8192KB
+# partition on its own. Two things follow: mtd4's offset MOVES when that
+# happens, so erase the overlay after the resize boot rather than before, and
+# `fw_printenv rootmtd` is not authoritative for anything. Read the image size,
+# or /proc/cmdline after a boot.
+#
+# ssc30kq-post-image.sh mirrors that arithmetic instead of hardcoding a limit,
+# and carries the note about retiring the whole mechanism when we build our own
+# U-Boot.
 #
 # panic=20 is a useful safety net during bring-up: a failed boot reboots after
 # 20s rather than hanging, so vendor U-Boot is always reachable again.
 BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/infinity6e/ssc30kq-post-image.sh"
 
-# Phase 1 is "boots to a shell". The camera stack (sigmastar-osdrv-infinity6e,
-# raptor) lands in phase 2, so nothing here touches /dev/mi_* yet.
+# The device type has to be stated. BR2_THINGINO_DEV_CAMERA is a hidden helper
+# (Config.soc.in:925) that gates the entire camera stack -- the streamer
+# choice, ONVIF, the ISP modules -- and it is only set by DEV_IPCAM or
+# DEV_WEBCAM. Leave the type unset and the streamer choice quietly defaults
+# back to None with nothing in the build log to say why.
+BR2_THINGINO_DEV_IPCAM=y
+
+# Phase 2: the camera stack. thingino-raptor's Ingenic hard-selects are guarded
+# on !BR2_SOC_SIGMASTAR now, so selecting Raptor here no longer drags MIPS
+# vendor blobs into an ARM rootfs.
+BR2_PACKAGE_THINGINO_STREAMER_RAPTOR=y
+
+# The vendor MI bundle. Also select-ed by thingino-raptor, but named here too:
+# the dependency is a dlopen, and a reader looking for what puts /dev/mi_* on
+# this image should find it in the board's own config.
+BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6E=y
+
+# ipcinfo, for load_sigmastar's sensor probe. Not needed on this unit -- its
+# OEM env already says sensor=gc4653 -- but this target is meant to run on any
+# SSC30KQ, including boards whose vendor never set the variable.
+BR2_PACKAGE_IPCTOOL=y
+
+# Daemon selection: the set OpenIPC's ssc30kq_raptor target actually brought
+# up on this silicon (rvd/rsd/rad/rod/ric), plus rhd.
 #
-# Upstream's streamer choice already defaults to Raptor, but package/
-# thingino-raptor/Config.in hard-selects ingenic-lib, ingenic-lib-libimp and
-# ingenic-system-libs-neo -- upstream's Raptor is still an Ingenic-only
-# package. Guarding those is phase 2 work; until then take no streamer at all
-# rather than drag MIPS vendor blobs into an ARM rootfs.
-BR2_PACKAGE_THINGINO_STREAMER_NONE=y
+# NOT the FULL set, and the reason is the build rather than the runtime. This
+# is the first time any of this code is compiled for ARM; rmr, rmd, rwd, rsp
+# and rsr have only ever been built against MIPS, and a daemon that fails to
+# compile fails the whole firmware build, turning an unrelated regression into
+# a phase-2 blocker. They come back on one at a time, each with its own build.
+#
+# rhd is in despite not being in OpenIPC's set because it links only LIB_IPC
+# and LIB_COMMON -- no HAL, so nothing about it is platform-specific -- and
+# phase 4's web UI wants HTTP snapshots.
+#
+# rac is unset explicitly: its default is "y if RAD", so dropping FULL does not
+# drop it.
+# BR2_PACKAGE_THINGINO_RAPTOR_FULL is not set
+BR2_PACKAGE_THINGINO_RAPTOR_RVD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RSD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RAD=y
+BR2_PACKAGE_THINGINO_RAPTOR_ROD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RIC=y
+BR2_PACKAGE_THINGINO_RAPTOR_RHD=y
+# BR2_PACKAGE_THINGINO_RAPTOR_RAC is not set
+
 BR2_PACKAGE_DROPBEAR=y
