@@ -207,32 +207,25 @@ BR2_PACKAGE_THINGINO_RAPTOR_CONF_SENSOR_ANTIFLICKER="2"
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_SENSOR_LOW_LATENCY_FALSE=y
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_RING_REFMODE_FALSE=y
 
-# IR-cut and IR LED pins, from config/raptor-ssc30kq.conf in the raptor fork
-# (gpio_ircut 24, gpio_ircut2 23, gpio_irled 60, gpio_irled2 59). That is the
-# provenance -- these were read off the file this board was brought up against,
-# NOT measured here. An earlier version of thingino.json claimed they were
-# board-verified on 2026-07-27; they were not, and that claim is removed.
+# [ircut] carries no gpio_* pins on purpose. They live in this camera's
+# thingino.json, which is where GPIO assignments belong on thingino -- one
+# place per board, read by ric and by anything else that needs them, rather
+# than duplicated into a streamer's own config.
 #
-# PIN ORDER IS POLARITY. The two ircut pins are an H-bridge: ric drives one
-# high and the other low for 100ms, then releases both (ric/ric_daynight.c:176).
-# Swapped, every switch drives the filter the wrong way, so day mode parks the
-# filter OUT, IR floods the sensor, and daylight returns with a magenta cast.
+# They were briefly set here instead, as a way around ric reading
+# /etc/thingino.json through a fixed 2047-byte buffer and silently failing to
+# parse our 2727-byte file. That is fixed upstream in raptor 4684315 -- the
+# read is sized from fstat, bounded at 64KB, and a file that exists but does
+# not parse now warns instead of returning silently -- so the workaround is
+# reverted and thingino.json is authoritative again.
 #
-# This order is VERIFIED on hardware as of 2026-07-28: with these pins in
-# effect the filter clicks on a day/night switch and the magenta cast is gone.
-# Both halves matter -- a click alone would only prove the pins are driven, and
-# it is the cast clearing that proves the polarity is the right way round.
+# raptor.conf's [ircut] still WINS if any gpio_* is set here: ric consults it
+# first and only fills in what it left at -1 (ric/ric_main.c). Leaving these
+# unset is what hands the decision to thingino.json. If a future board needs
+# to override just one pin, setting it here is the supported way.
 #
-# Worth knowing if this ever looks broken again: /etc is an overlayfs on
-# rootfs_data, so a hand-edited /etc/raptor.conf SURVIVES A REFLASH and shadows
-# the packaged one. That happened here and made a correct defconfig change look
-# like it had no effect. `raptorctl config get ircut` reports what the running
-# daemon actually has; compare it against this block before assuming the build
-# is at fault.
-BR2_PACKAGE_THINGINO_RAPTOR_CONF_IRCUT_GPIO_IRCUT="24"
-BR2_PACKAGE_THINGINO_RAPTOR_CONF_IRCUT_GPIO_IRCUT2="23"
-BR2_PACKAGE_THINGINO_RAPTOR_CONF_IRCUT_GPIO_IRLED="60"
-BR2_PACKAGE_THINGINO_RAPTOR_CONF_IRCUT_GPIO_IRLED2="59"
+# Pin order is polarity and is VERIFIED on hardware (2026-07-28) -- see the
+# note in thingino.json.
 
 # [image] is deliberately left entirely at defaults, and that is a decision
 # rather than an omission. load_sigmastar hands the ISP the tuned

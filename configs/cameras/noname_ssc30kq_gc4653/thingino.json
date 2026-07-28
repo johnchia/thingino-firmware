@@ -1,5 +1,5 @@
 {
-  "_comment": "Informational only. raptor.conf's [ircut] is authoritative and is set in the defconfig; ric consults this file only when those pins are -1. Pin order is polarity, and this order is verified on hardware (2026-07-28): the filter clicks and the daylight magenta cast is gone.",
+  "_comment": "Authoritative GPIO map for this board. ric reads it directly (needs raptor >= 4684315, which fixed a fixed-2047-byte read that silently failed to parse files this size). IR-CUT PIN ORDER IS POLARITY: the two ircut pins are an H-bridge, and swapped, day mode parks the filter out, IR floods the sensor, and daylight returns magenta. This order is verified on hardware 2026-07-28 -- the filter clicks on a day/night switch AND the cast is gone; the click alone would only prove the pins are driven. ir850 is the only LED switched; ir940 defaults off. Provenance: config/raptor-ssc30kq.conf in the raptor fork, then confirmed on the board. To override a single pin, set gpio_* in raptor.conf's [ircut] -- ric consults that first and only fills in what it left at -1.",
   "gpio": {
     "ircut": "24 23",
     "ir850": 60,
