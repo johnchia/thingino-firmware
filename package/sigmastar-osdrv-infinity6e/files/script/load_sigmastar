@@ -1,0 +1,126 @@
+#!/bin/sh
+#
+# Insert the SigmaStar MI kernel modules and bind the sensor driver.
+#
+# Ported from OpenIPC (general/package/sigmastar-osdrv-infinity6e). Three
+# deliberate changes from their version:
+#
+#   1. The module directory is derived from `uname -r` rather than hardcoded
+#      to 4.9.84. The modules are installed under the kernel release Buildroot
+#      probed, and hardcoding it here means a kernel bump silently loads
+#      nothing -- the loop just finds no files and every later insmod fails
+#      with a message about the module, not about the path.
+#   2. The OpenIPC-specific bits are gone: the `fpv` check against
+#      /etc/os-release, and the OpenIPC logger tag.
+#   3. Autodetection degrades instead of failing. `ipcinfo` comes from the
+#      ipctool package; if it is not in the image, the U-Boot `sensor`
+#      variable is the only source and we say so rather than reporting an
+#      empty sensor name.
+#
+# Argument: any non-empty first argument means "trust the stored sensor
+# variable if there is one". The init script passes -i, matching OpenIPC's
+# S70vendor. Called with no arguments it always re-probes, which is what you
+# want when swapping a sensor on the bench.
+
+MODULE=/lib/modules/$(uname -r)/sigmastar
+SENSOR=$(fw_printenv -n sensor 2>/dev/null)
+
+log() { echo "$@" | logger -s -t sigmastar; }
+
+detect_sensor() {
+	if [ ! -x /usr/bin/ipcinfo ] && ! command -v ipcinfo >/dev/null 2>&1; then
+		log "no ipcinfo in this image -- cannot probe, set the U-Boot 'sensor' variable"
+		return 1
+	fi
+
+	# sensor_config.ko exposes /dev/srcfg; writing this line runs the i2c
+	# probe whose result ipcinfo then reads back.
+	insmod $MODULE/sensor_config.ko 2>/dev/null
+	if [ -e /dev/srcfg ]; then
+		echo srcfg 0 1 0 0 0 0 >/dev/srcfg
+		rmmod sensor_config
+	fi
+
+	SENSOR=$(ipcinfo -s 2>/dev/null)
+	[ -n "$SENSOR" ] || return 1
+
+	# Persist so later boots skip the probe. Only written when it actually
+	# changes: this runs on every boot and the env partition is NOR.
+	if [ "$SENSOR" != "$(fw_printenv -n sensor 2>/dev/null)" ]; then
+		fw_setenv sensor "$SENSOR"
+	fi
+}
+
+set_sensor() {
+	case $SENSOR in
+		gc2053 | gc4653 | imx274 | imx307 | imx335 | imx347 | imx415 | sc501ai | sc8235 | os04a10 | os04c10)
+			insmod $MODULE/sensor_${SENSOR}_mipi.ko chmap=1
+			;;
+		tp9950)
+			insmod $MODULE/sensor_${SENSOR}_mipi.ko chmap=1 mode=3 channel=0
+			;;
+		tp9951)
+			insmod $MODULE/sensor_${SENSOR}_mipi.ko chmap=1 mode=0 channel=2
+			;;
+		*)
+			log "unsupported sensor - $SENSOR"
+			return 1
+			;;
+	esac
+}
+
+# Load order is the vendor's and is not arbitrary -- mi_sys owns the buffer
+# pool every later module registers against, and mi_venc wants the ISP
+# firmware path at insmod time.
+insert_ko() {
+	insmod $MODULE/mhal.ko
+	insmod $MODULE/mi_common.ko
+	insmod $MODULE/mi_sys.ko cmdQBufSize=768 logBufSize=256
+	insmod $MODULE/mi_rgn.ko
+	insmod $MODULE/mi_ldc.ko
+	insmod $MODULE/mi_ai.ko
+	insmod $MODULE/mi_ao.ko
+	insmod $MODULE/mi_mipitx.ko
+	insmod $MODULE/mi_sensor.ko
+	insmod $MODULE/mi_shadow.ko
+	insmod $MODULE/mi_divp.ko
+	insmod $MODULE/mi_vif.ko
+	insmod $MODULE/mi_vpe.ko
+	insmod $MODULE/mi_venc.ko fw_path=/etc/firmware/chagall.bin
+
+	# mi_poll registers a chrdev with no class, so devtmpfs does not create
+	# the node for it. Everything else under /dev/mi_* appears on its own.
+	MAJOR=$(awk '$2=="mi_poll" {print $1}' /proc/devices)
+	[ -n "$MAJOR" ] && mknod /dev/mi_poll c "$MAJOR" 0
+	echo isproot /etc/firmware >/dev/ispmid
+}
+
+if [ ! -d "$MODULE" ]; then
+	log "no vendor modules at $MODULE"
+	exit 1
+fi
+
+if [ ! -e /sys/module/mi_common ]; then
+	insert_ko
+fi
+
+if [ -z "$1" ] || [ -z "$SENSOR" ]; then
+	log "probing for sensor"
+	detect_sensor
+fi
+
+if [ -z "$SENSOR" ]; then
+	log "no sensor identified -- set the U-Boot 'sensor' variable"
+	exit 1
+fi
+
+# Re-binding: drop whatever driver is already bound before inserting one.
+DRIVER=$(ls /sys/module | grep "$SENSOR")
+if [ -n "$DRIVER" ]; then
+	rmmod $DRIVER
+fi
+
+log "sensor $SENSOR"
+set_sensor
+
+exit $?

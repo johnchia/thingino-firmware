@@ -1,0 +1,14 @@
+config BR2_PACKAGE_IPCTOOL
+	bool "ipctool"
+	depends on BR2_SOC_SIGMASTAR
+	help
+	  OpenIPC's IP-camera hardware identification tool. Installs
+	  `ipcinfo`, which reports the SoC, the flash chip and -- the reason
+	  this board wants it -- the sensor actually attached, probed over
+	  i2c rather than read from a stored variable.
+
+	  load_sigmastar falls back to `ipcinfo -s` when the U-Boot `sensor`
+	  variable is unset, which is what makes one image work on any board
+	  of this model instead of only on boards whose OEM set the variable.
+
+	  https://github.com/openipc/ipctool
