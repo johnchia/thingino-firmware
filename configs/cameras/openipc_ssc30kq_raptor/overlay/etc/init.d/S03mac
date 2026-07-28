@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Take the MAC from the vendor U-Boot environment.
+#
+# Overrides the shared overlay/etc/init.d/S03mac, which derives a MAC from the
+# Ingenic SoC serial-number registers at 0x13540200-0x1354023C via devmem. That
+# is an Ingenic efuse address; on Infinity6E it is outside the RIU window and
+# there is nothing meaningful to read there. CONFIG_STRICT_DEVMEM is off in this
+# kernel, so the read is not refused -- it either returns zeros (the script's
+# all-zero check then exits cleanly) or it returns garbage, and garbage is the
+# bad case: the shared script only runs when eth.mac is unset and it *persists*
+# what it computes, so one bad read becomes a permanently wrong MAC, and an
+# unstable one means a new DHCP lease on every boot.
+#
+# Vendor U-Boot already holds the board's real MAC in `ethaddr` -- it is what
+# the stock firmware and OpenIPC both boot with. Read that instead. Requires the
+# corrected sector size in this camera's fw_env.config to be able to read the
+# env at all.
+#
+# If ethaddr is absent or malformed, do nothing: the EMAC driver keeps whatever
+# MAC U-Boot programmed into it, which is the behaviour on this board today. A
+# missing eth.mac in thingino.json is not an error, it just means nothing
+# overrides the hardware.
+#
+# wlan.mac is deliberately not derived. This board has no wifi.
+
+CONFIG_JSON="/etc/thingino.json"
+
+command -v jct >/dev/null 2>&1 || exit 0
+
+# Already set, nothing to do.
+jct "$CONFIG_JSON" get eth.mac >/dev/null 2>&1 && exit 0
+
+command -v fw_printenv >/dev/null 2>&1 || exit 0
+
+eth_mac=$(fw_printenv -n ethaddr 2>/dev/null) || exit 0
+
+# Accept only a well-formed unicast MAC. Rejecting the all-zero and broadcast
+# addresses matters because U-Boot will happily report either.
+case "$eth_mac" in
+	[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]) ;;
+	*) exit 0 ;;
+esac
+
+case "$eth_mac" in
+	00:00:00:00:00:00 | [fF][fF]:[fF][fF]:[fF][fF]:[fF][fF]:[fF][fF]:[fF][fF]) exit 0 ;;
+esac
+
+echo -c 240 -e "- ETH MAC from U-Boot env: $eth_mac"
+
+jct "$CONFIG_JSON" set eth.mac "$eth_mac"

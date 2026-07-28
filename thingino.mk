@@ -20,10 +20,15 @@ ifneq ($(SIGMASTAR_SOC_MODEL_INPUT),)
 	# (xburst1/xburst2) shared by several families; here the family is the
 	# finest split that exists, so the two coincide.
 	SOC_ARCH := $(SOC_FAMILY)
+	# From the board's U-Boot bootargs: LX_MEM=0xFFE0000 is 268304384 bytes, so
+	# this is a 256MB part. (Of that, mma_heap sz=0x9E9C000 -- about 158MB -- is
+	# carved out for the multimedia heap, leaving Linux roughly 97MB.)
+	#
 	# Only feeds the Ingenic ISP module's rmem/nmem defaults further down, which
-	# this vendor does not load. Confirm against /proc/meminfo on the device
-	# before relying on it for anything else.
-	SOC_RAM_MB := 128
+	# this vendor does not load: on SigmaStar the carve-out is done by LX_MEM and
+	# mma_heap in the vendor U-Boot bootargs, which we do not touch. So this is
+	# inert here -- but it should still say what the hardware is.
+	SOC_RAM_MB := 256
 	# Set here so the Ingenic default chain below (guarded on an empty
 	# KERNEL_VERSION) leaves it alone. The tree is pulled as a tarball, not from
 	# KERNEL_SITE/BRANCH/HASH, so this value only names the output directory.

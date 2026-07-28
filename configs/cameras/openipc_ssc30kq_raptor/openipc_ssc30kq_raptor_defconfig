@@ -29,15 +29,30 @@ BR2_TOOLCHAIN_EXTERNAL_CXX=y
 BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
 
 # Vendor U-Boot stays on the chip, so there is no uenv.txt and no full-chip
-# image. The kernel and rootfs are flashed to the vendor partition table:
+# image. Everything below is dictated by the bootargs already in the vendor
+# U-Boot environment, read from the running device:
 #
-#   0x000000040000-0x000000050000 : "env"
-#   0x000000050000-0x000000250000 : "kernel"       2048KB
-#   0x000000250000-0x000000750000 : "rootfs"       5120KB
-#   0x000000750000-0x000001000000 : "rootfs_data"  8896KB
+#   console=ttyS0,115200 panic=20 root=/dev/mtdblock3 init=/init
+#   mtdparts=NOR_FLASH:256k(boot),64k(env),2048k(kernel),5120k(rootfs),-(rootfs_data)
+#   LX_MEM=0xFFE0000 mma_heap=mma_heap_name0,miu=0,sz=0x9E9C000 cma=2M
 #
-# The 5120KB rootfs cap is the real budget, and it is not derivable from the
-# 16MB flash size. Re-read /proc/mtd on the device before changing this.
+# Four things there are load-bearing and none of them are ours to set:
+#
+#   init=/init         - thingino's overlay init runs, so /etc is writable via
+#                        an overlayfs on rootfs_data. Without this the rootfs
+#                        would be read-only squashfs.
+#   root=/dev/mtdblock3  - rootfs.squashfs must be flashed to mtd3, uImage to
+#                        mtd2. Confirm indices from /proc/mtd, not from here.
+#   mtdparts=...       - the partition table comes from the cmdline, not the
+#                        device tree (CONFIG_MTD_CMDLINE_PARTS=y,
+#                        CONFIG_MTD_OF_PARTS unset). The 5120KB rootfs cap the
+#                        post-image script enforces is this, and it is not
+#                        derivable from the 16MB flash size.
+#   console=ttyS0      - inittab respawns getty on /dev/console, which resolves
+#                        through this.
+#
+# panic=20 is a useful safety net during bring-up: a failed boot reboots after
+# 20s rather than hanging, so vendor U-Boot is always reachable again.
 BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/infinity6e/ssc30kq-post-image.sh"
 
 # Phase 1 is "boots to a shell". The camera stack (sigmastar-osdrv-infinity6e,
