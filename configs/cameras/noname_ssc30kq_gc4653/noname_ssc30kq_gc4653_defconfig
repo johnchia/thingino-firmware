@@ -125,6 +125,9 @@ BR2_PACKAGE_IPCTOOL=y
 # compile fails the whole firmware build, turning an unrelated regression into
 # a phase-2 blocker. They come back on one at a time, each with its own build.
 #
+# rwd came back in phase 4 (see the _WEBRTC block below) -- the live preview
+# needs it. Still deferred: rmr, rmd, rsp, rsr.
+#
 # rhd is in despite not being in OpenIPC's set because it links only LIB_IPC
 # and LIB_COMMON -- no HAL, so nothing about it is platform-specific -- and
 # phase 4's web UI wants HTTP snapshots.
@@ -139,6 +142,21 @@ BR2_PACKAGE_THINGINO_RAPTOR_ROD=y
 BR2_PACKAGE_THINGINO_RAPTOR_RIC=y
 BR2_PACKAGE_THINGINO_RAPTOR_RHD=y
 # BR2_PACKAGE_THINGINO_RAPTOR_RAC is not set
+
+# RWD, the WebRTC/WHIP server -- the first of the five deferred daemons to come
+# back, because the web UI's live preview is WebRTC and nothing else provides
+# it. var/www/x/webrtc-whip.cgi proxies to https://127.0.0.1:8554/whip and
+# returns 502 {"error":"backend_unreachable"} when no daemon is listening,
+# which is exactly what a browser saw with rwd absent.
+#
+# No [webrtc] settings needed: the shipped defaults already match the proxy
+# (http_port 8554, https true) and the cert/key point at uhttpd's, so signalling
+# reuses the certificate the browser has already accepted.
+#
+# Note the symbol is _WEBRTC, not _RWD like its siblings. It depends on
+# _RAPTOR_TLS (already on) and selects BR2_PACKAGE_MBEDTLS_DTLS_SRTP, so
+# enabling it rebuilds mbedTLS with DTLS-SRTP.
+BR2_PACKAGE_THINGINO_RAPTOR_WEBRTC=y
 
 # Stream geometry and the sensor settings this board was brought up with.
 #
@@ -186,9 +204,15 @@ BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_BITRATE="4000000"
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_RC_MODE="cbr"
 # 2 seconds at 30fps.
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_GOP="60"
-# MJPEG is wired in the SigmaStar encoder but was never verified on hardware,
-# so it stays off rather than shipping a snapshot path nobody has looked at.
-BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_JPEG_FALSE=y
+# JPEG on, for the snapshot path. It was off through phases 2-3 on the grounds
+# that MJPEG was unverified on this silicon and shipping an unexercised snapshot
+# path was worse than not having one. Phase 4 is where it gets exercised: rhd
+# serves /x/ch0.jpg and /x/ch0.mjpg, which the web UI offers as endpoints and
+# which ONVIF and the HA integration use for stills. Turning it on is the point
+# at which "unverified" becomes testable rather than permanent.
+#
+# This is NOT what drives the live preview -- that is WebRTC through rwd, above.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_JPEG_TRUE=y
 
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_ENABLED_TRUE=y
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_WIDTH="640"
@@ -200,7 +224,9 @@ BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_BITRATE="1000000"
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_RC_MODE="cbr"
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_GOP="30"
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_OSD_ENABLED_FALSE=y
-BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_JPEG_FALSE=y
+# Sub-stream snapshots too: at 640x360 the encode is cheap, and it gives the
+# UI and ONVIF a low-cost still that does not tie up the 2560x1440 encoder.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_JPEG_TRUE=y
 
 # 50Hz mains. antiflicker is the ISP's flicker-avoidance mode, not a boolean.
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_SENSOR_ANTIFLICKER="2"
