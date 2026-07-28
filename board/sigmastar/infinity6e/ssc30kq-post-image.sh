@@ -47,6 +47,14 @@
 # ROOTFS_LIMIT below mirrors the U-Boot arithmetic exactly rather than
 # hardcoding either value, so it stays correct as the image grows.
 #
+# THIS IS A PROPERTY OF OPENIPC'S BOOTLOADER, NOT OF THE BOARD. The auto-sizing
+# is code in OpenIPC's cmd_sf.c; mainline U-Boot and SigmaStar's vendor tree do
+# not do it. When we build our own U-Boot and move to thingino's partition
+# table, the rootfs partition gets sized to the built image at *build* time,
+# this whole mechanism becomes redundant and then wrong, and rootfs_limit_for()
+# must be deleted in the same commit -- otherwise the build keeps enforcing a
+# limit that no longer describes the device, silently and permissively.
+#
 # Two things that look like state but are not, and cost a lot of debugging:
 #
 #   - /proc/cmdline is the expansion from the last boot. It is not updated by
