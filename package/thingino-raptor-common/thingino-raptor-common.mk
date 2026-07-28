@@ -28,4 +28,14 @@ define THINGINO_RAPTOR_COMMON_INSTALL_TARGET_CMDS
 		$(TARGET_DIR)/usr/lib/librss_common.so
 endef
 
+# See the matching block in thingino-raptor.mk for why the SigmaStar source
+# override lives at the bottom of the file rather than beside the pinned hash.
+# This library is architecture-neutral; the fork is pinned only so all four
+# raptor repositories come from one place and one branch. Point it back at
+# gtxaspec the moment the branch is merged there.
+ifeq ($(BR2_SOC_SIGMASTAR),y)
+THINGINO_RAPTOR_COMMON_VERSION = 6e2e674803415a4ed2d99c70a2ade7c3be373a7d
+THINGINO_RAPTOR_COMMON_SITE = https://github.com/johnchia/raptor-common
+endif
+
 $(eval $(generic-package))

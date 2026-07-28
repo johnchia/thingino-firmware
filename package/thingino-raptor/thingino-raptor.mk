@@ -5,8 +5,22 @@ THINGINO_RAPTOR_SITE_METHOD = git
 THINGINO_RAPTOR_LICENSE = GPL-3.0
 THINGINO_RAPTOR_LICENSE_FILES = COPYING
 
-THINGINO_RAPTOR_DEPENDENCIES += ingenic-lib compy libschrift
+THINGINO_RAPTOR_DEPENDENCIES += compy libschrift
 THINGINO_RAPTOR_DEPENDENCIES += thingino-raptor-hal thingino-raptor-ipc thingino-raptor-common
+
+# ingenic-lib supplies libimp/libalog, which raptor links on Ingenic and does
+# not link at all on SigmaStar -- the HAL dlopens the MI libraries instead, and
+# raptor/Makefile leaves VENDOR_LIBS empty for that vendor.
+#
+# The SigmaStar side is not a link-time dependency either, for the same reason,
+# but it is still declared: dlopen at runtime means the linker will never
+# complain, so build order is the only place this can be stated. Without it a
+# parallel build can install the daemons before the MI libraries exist.
+ifeq ($(BR2_SOC_SIGMASTAR),y)
+THINGINO_RAPTOR_DEPENDENCIES += sigmastar-osdrv-infinity6e
+else
+THINGINO_RAPTOR_DEPENDENCIES += ingenic-lib
+endif
 
 ifeq ($(BR2_TOOLCHAIN_USES_MUSL),y)
 THINGINO_RAPTOR_DEPENDENCIES += ingenic-musl
@@ -198,6 +212,23 @@ define THINGINO_RAPTOR_INSTALL_TARGET_CMDS
 	$(call THINGINO_RAPTOR_PATCH_CONF)
 
 endef
+
+# SigmaStar source override.
+#
+# The INFINITY6E backend is not in gtxaspec/raptor yet, so the hash at the top
+# of this file has no SigmaStar support in it and the build would fail on
+# `PLATFORM not set` territory -- or worse, silently build the Ingenic path.
+# Until the work is upstreamed, this vendor builds from the fork.
+#
+# Placed here rather than beside the _VERSION/_SITE lines at the top on
+# purpose. Upstream bumps those regularly; a block sitting three lines away
+# turns every one of those bumps into a merge conflict, and a block down here
+# does not. Buildroot reads _VERSION and _SITE when generic-package is
+# evaluated, which is the line below, so this is still in time.
+ifeq ($(BR2_SOC_SIGMASTAR),y)
+THINGINO_RAPTOR_VERSION = 04f19b5c4c7558cb7eafc4fd0cd81e11c75c38ce
+THINGINO_RAPTOR_SITE = https://github.com/johnchia/raptor
+endif
 
 include $(BR2_EXTERNAL_THINGINO_PATH)/package/thingino-raptor/thingino-raptor-conf.mk
 

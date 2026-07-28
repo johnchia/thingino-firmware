@@ -5,7 +5,14 @@ THINGINO_RAPTOR_HAL_GIT_SUBMODULES = YES
 THINGINO_RAPTOR_HAL_INSTALL_STAGING = YES
 THINGINO_RAPTOR_HAL_INSTALL_TARGET = NO
 
+# SigmaStar builds no Ingenic headers and links no vendor library: raptor-hal's
+# Makefile leaves SDK_INCLUDE empty for that vendor and the MI ABI declarations
+# plus their dlopen thunks live in src/star/ inside the tree. The
+# INGENIC_HEADERS argument below is inert there for the same reason, so it is
+# left alone rather than made conditional.
+ifneq ($(BR2_SOC_SIGMASTAR),y)
 THINGINO_RAPTOR_HAL_DEPENDENCIES = ingenic-lib
+endif
 
 THINGINO_RAPTOR_HAL_PLATFORM = $(shell echo $(SOC_FAMILY) | tr a-z A-Z)
 
@@ -29,5 +36,12 @@ define THINGINO_RAPTOR_HAL_INSTALL_STAGING_CMDS
 	$(INSTALL) -D -m 0644 $(@D)/include/raptor_hal.h \
 		$(STAGING_DIR)/usr/include/raptor_hal.h
 endef
+
+# See the matching block in thingino-raptor.mk for why the SigmaStar source
+# override lives at the bottom of the file rather than beside the pinned hash.
+ifeq ($(BR2_SOC_SIGMASTAR),y)
+THINGINO_RAPTOR_HAL_VERSION = 43ec61f1d1d83d57058e542effd9df9e0fcd9be5
+THINGINO_RAPTOR_HAL_SITE = https://github.com/johnchia/raptor-hal
+endif
 
 $(eval $(generic-package))
