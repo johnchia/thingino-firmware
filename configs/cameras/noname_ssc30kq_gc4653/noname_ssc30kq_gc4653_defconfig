@@ -218,13 +218,17 @@ BR2_PACKAGE_THINGINO_RAPTOR_CONF_RING_REFMODE_FALSE=y
 # Swapped, every switch drives the filter the wrong way, so day mode parks the
 # filter OUT, IR floods the sensor, and daylight returns with a magenta cast.
 #
-# The order below is therefore UNVERIFIED on this hardware. Until the pins were
-# set here the filter was never driven at all, so a swap has never been ruled
-# out -- the magenta cast that led to this block is equally consistent with no
-# actuation and with inverted actuation. If the cast survives this change AND
-# the filter now audibly clicks on a day/night switch, swap these two before
-# reaching for white balance. If it clicks and the cast is gone, the order is
-# right and this note can say so.
+# This order is VERIFIED on hardware as of 2026-07-28: with these pins in
+# effect the filter clicks on a day/night switch and the magenta cast is gone.
+# Both halves matter -- a click alone would only prove the pins are driven, and
+# it is the cast clearing that proves the polarity is the right way round.
+#
+# Worth knowing if this ever looks broken again: /etc is an overlayfs on
+# rootfs_data, so a hand-edited /etc/raptor.conf SURVIVES A REFLASH and shadows
+# the packaged one. That happened here and made a correct defconfig change look
+# like it had no effect. `raptorctl config get ircut` reports what the running
+# daemon actually has; compare it against this block before assuming the build
+# is at fault.
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_IRCUT_GPIO_IRCUT="24"
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_IRCUT_GPIO_IRCUT2="23"
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_IRCUT_GPIO_IRLED="60"
