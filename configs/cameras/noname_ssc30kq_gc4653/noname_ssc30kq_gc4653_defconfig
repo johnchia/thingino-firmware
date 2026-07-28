@@ -152,9 +152,27 @@ BR2_PACKAGE_THINGINO_RAPTOR_RHD=y
 # the file this hardware was actually brought up against. They are set through
 # thingino's own Kconfig knobs rather than by installing that file, because on
 # thingino the two things it carries have better homes: geometry belongs here,
-# where a reader looking at the board looks, and its hardcoded IR-cut GPIO pins
-# belong in thingino.json -- ric reads them from there automatically, and that
-# file's absence on OpenIPC is the only reason they were ever in raptor.conf.
+# where a reader looking at the board looks, and its IR-cut GPIO pins are set
+# below in the [ircut] section.
+#
+# The pins were originally left out of here and put ONLY in thingino.json, on
+# the reasoning that ric auto-discovers them from that file. It does
+# (ric/ric_main.c:411 load_gpio_from_thingino_json) -- but that path reads
+# /etc/thingino.json into a fixed 2048-byte buffer, and thingino's assembled
+# config is 2727 bytes on this board. fread truncates mid-structure,
+# cJSON_Parse returns NULL, and ric returns silently by design, because a
+# missing thingino.json is the normal case on OpenIPC and warning about it
+# every boot would be noise. The pins stayed -1, ric never exported or drove
+# the GPIOs, the IR-cut filter never engaged, and the stream came back with a
+# magenta cast in daylight -- with nothing in any log to say why.
+#
+# So set them HERE. raptor.conf's [ircut] is the authoritative source, is
+# consulted first, and short-circuits the JSON discovery entirely: with
+# gpio_ircut, gpio_irled and gpio_irled2 all >= 0, load_gpio_from_thingino_json
+# returns at its first guard without opening the file. thingino.json keeps its
+# gpio block as well -- it costs nothing, it is where other thingino consumers
+# look, and it is correct once ric's buffer is fixed -- but nothing depends on
+# it being read any more.
 #
 # The patcher (thingino-raptor-conf.mk) rewrites commented keys in place, so
 # setting a value here both uncomments and sets it. Keys left empty are skipped
@@ -188,6 +206,29 @@ BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_JPEG_FALSE=y
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_SENSOR_ANTIFLICKER="2"
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_SENSOR_LOW_LATENCY_FALSE=y
 BR2_PACKAGE_THINGINO_RAPTOR_CONF_RING_REFMODE_FALSE=y
+
+# IR-cut and IR LED pins, from config/raptor-ssc30kq.conf in the raptor fork
+# (gpio_ircut 24, gpio_ircut2 23, gpio_irled 60, gpio_irled2 59). That is the
+# provenance -- these were read off the file this board was brought up against,
+# NOT measured here. An earlier version of thingino.json claimed they were
+# board-verified on 2026-07-27; they were not, and that claim is removed.
+#
+# PIN ORDER IS POLARITY. The two ircut pins are an H-bridge: ric drives one
+# high and the other low for 100ms, then releases both (ric/ric_daynight.c:176).
+# Swapped, every switch drives the filter the wrong way, so day mode parks the
+# filter OUT, IR floods the sensor, and daylight returns with a magenta cast.
+#
+# The order below is therefore UNVERIFIED on this hardware. Until the pins were
+# set here the filter was never driven at all, so a swap has never been ruled
+# out -- the magenta cast that led to this block is equally consistent with no
+# actuation and with inverted actuation. If the cast survives this change AND
+# the filter now audibly clicks on a day/night switch, swap these two before
+# reaching for white balance. If it clicks and the cast is gone, the order is
+# right and this note can say so.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_IRCUT_GPIO_IRCUT="24"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_IRCUT_GPIO_IRCUT2="23"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_IRCUT_GPIO_IRLED="60"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_IRCUT_GPIO_IRLED2="59"
 
 # [image] is deliberately left entirely at defaults, and that is a decision
 # rather than an omission. load_sigmastar hands the ISP the tuned

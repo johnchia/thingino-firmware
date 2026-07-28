@@ -1,5 +1,5 @@
 {
-  "_comment": "IR-cut PIN ORDER IS POLARITY. The two ircut pins are an H-bridge: ric drives one high and the other low for 100ms, then releases both. Swapped, every switch drives the filter the wrong way and day mode runs with the filter parked out -- IR floods the sensor and daylight comes back with a purple cast. Board-verified in this order on 2026-07-27. If a variant shows that cast in daylight, swap these two rather than reaching for the white balance. ir850 is the only LED switched; ir940 defaults off. These are measured on hardware, not read off a schematic.",
+  "_comment": "Informational only. raptor.conf's [ircut] is authoritative and is set in the defconfig; ric only consults this file when those pins are -1, and its reader truncates at 2048 bytes, which is less than the assembled /etc/thingino.json. Pin order is polarity and is unverified -- see the [ircut] block in the defconfig.",
   "gpio": {
     "ircut": "24 23",
     "ir850": 60,

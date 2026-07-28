@@ -51,10 +51,14 @@ $(eval $(generic-package))
 #
 #     $(call per-package-rsync,$(sort $(PACKAGES)),target,$(TARGET_DIR),copy)
 #
-# That is a plain file copy in ALPHABETICAL package order, not a JSON merge, so
-# exactly one author's copy survives. thingino-agent sorts before thingino-ha,
-# so the agent block loses every time -- deterministically, on every build, not
-# by luck of the dependency graph. The symptom is silent: the build is green,
+# which is a single rsync fed a --files-from list of every package's private
+# dir (pkg-utils.mk:270). It copies files; it does not merge JSON, so exactly
+# one author's copy of this path survives. Which one is decided by rsync's
+# duplicate handling over that list -- the list is sorted and then reversed by
+# `tac`, and what comes out is thingino-ha's copy, verified by comparing the
+# assembled file byte-for-byte against each per-package copy. The important
+# property is that it is stable: the agent block loses on every build, not by
+# luck of the dependency graph. The symptom is silent: the build is green,
 # /etc/thingino.json looks well-formed, and S95thingino-agent reads
 # agent.enabled as empty and logs "Disabled in /etc/thingino.json" while the
 # listener never starts.
@@ -66,7 +70,7 @@ $(eval $(generic-package))
 # single owner.
 #
 # Scope note: thingino-core and thingino-button lose the same race, and
-# thingino-uboot would outrank thingino-ha if it were built. Only the agent is
+# thingino-uboot would also contend if it were built. Only the agent is
 # fixed here because only the agent's loss is load-bearing for this board --
 # core's content survives via ha's copy, and neither button nor uboot is built.
 ifeq ($(BR2_PACKAGE_THINGINO_AGENT),y)
