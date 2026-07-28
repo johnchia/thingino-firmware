@@ -12,47 +12,58 @@
 # is retuned by `fw_setenv rootmtd <size>` alone -- no bootargs edit, and the
 # kernel load path (bootcmd's ${kernaddr}/${kernsize}) is never touched.
 #
-# The catch: fw_setenv rootmtd does NOT currently reach U-Boot on this board.
-# The stored env reads 8192k and has on both units tested, yet /proc/cmdline
-# expands to 5120k after a reboot -- while other fw_setenv writes in the same
-# session (bootdelay, rootsize, sysupgrade_complete) persist fine in what
-# fw_printenv reads back. So userspace is self-consistent but U-Boot is reading
-# its environment from somewhere fw_env.config does not point at. Two different
-# units behave identically, so this is a platform property, not corruption.
+# ${rootmtd} is NOT read from the stored environment. OpenIPC's U-Boot
+# (github.com/openipc/u-boot-sigmastar) re-derives it on every boot, in
+# common/cmd_sf.c's `sf probe`:
 #
-# Until that is understood, the effective layout remains the vendor's:
+#   spi_flash_read(flash, CONFIG_ENV_ROOTADDR, sizeof(buf), buf);
+#   memcpy(&magic, &buf[0],  sizeof(magic));
+#   memcpy(&bytes, &buf[40], sizeof(bytes));
+#   if (magic == 0x73717368)                  /* "hsqs", squashfs superblock */
+#       if (bytes + 0x1000 < 0x500000) setenv("rootmtd", "5120k");
+#       else                           setenv("rootmtd", "8192k");
+#
+# It reads the squashfs superblock at the rootfs offset and sizes the partition
+# from bytes_used. bootcmd begins with `sf probe 0`, so this runs before
+# `run setargs` expands ${rootmtd}. Whatever is in the stored env is overwritten
+# in RAM every boot -- `fw_setenv rootmtd` can never take effect, on any unit.
+# (A stored 8192k is a fossil: CONFIG_BOOTCOMMAND does `sf probe 0; saveenv`, so
+# a first boot with a larger image persisted it once and nothing rewrote it.)
+#
+# So the rootfs partition auto-sizes to the image, and the limit is a function
+# of the image rather than a constant. The threshold sits just below 5120k, so
+# there is no gap to fall into: an image that outgrows the 5120KB partition gets
+# the 8192KB one automatically.
 #
 #   mtd0  "boot"          256KB
 #   mtd1  "env"            64KB
 #   mtd2  "kernel"       2048KB   <- uImage goes here
-#   mtd3  "rootfs"       5120KB   <- rootfs.squashfs here
-#   mtd4  "rootfs_data"  8896KB   <- jffs2 overlay upperdir, the "-" remainder
+#   mtd3  "rootfs"    5120/8192KB <- rootfs.squashfs here; sized by sf probe
+#   mtd4  "rootfs_data"      rest <- jffs2 overlay upperdir, the "-" remainder
 #
-# ROOTFS_LIMIT is 5120k to match. Raising it to 8192k on the strength of the
-# stored env would let a build pass here and then fail to flash, which is the
-# exact failure this script exists to prevent. Raise it only once /proc/cmdline
-# on a booted device actually shows 8192k.
+# Note mtd4's offset therefore moves with the rootfs size. Erase it after the
+# rootfs is flashed and after the reboot that resizes the partition, not before.
 #
-# Two traps this has already sprung:
+# ROOTFS_LIMIT below mirrors the U-Boot arithmetic exactly rather than
+# hardcoding either value, so it stays correct as the image grows.
 #
-#   - /proc/cmdline is the expansion from the last boot and does not track later
-#     fw_setenv changes. It read 5120k while the env already said 8192k. Trust
-#     `fw_printenv rootmtd`, not /proc/cmdline, and remember /proc/mtd only
-#     catches up after a reboot.
-#   - `rootsize` (0x500000) is a separate variable used by urwrite for TFTP
-#     rootfs writes. It does not follow rootmtd. If rootmtd changes, rootsize
-#     has to be changed with it or a TFTP write erases the wrong length.
+# Two things that look like state but are not, and cost a lot of debugging:
 #
-# Re-read `fw_printenv rootmtd` before changing ROOTFS_LIMIT below.
+#   - /proc/cmdline is the expansion from the last boot. It is not updated by
+#     fw_setenv, and /proc/mtd only catches up after a reboot.
+#   - `fw_printenv rootmtd` is not authoritative for anything. It reports a
+#     stored value that sf probe overwrites before it is ever used. Read the
+#     image size, or /proc/cmdline after a boot, and ignore the stored variable.
 #
-# The version carried over from OpenIPC checked rootfs against a flat 8MB and
-# did not check the kernel at all. Neither is right for this board: the chip is
-# 16MB but the rootfs partition is 5MB of it, so the limit cannot be derived
-# from the flash size. Getting it wrong moves the failure from the build, where
-# it is a number, to the flash, where it is a camera in an unknown state --
-# flashcp just refuses with "bigger than /dev/mtd3".
+# `rootsize` is likewise re-derived by sf probe (from ${filesize}). It is used
+# by urwrite for TFTP rootfs writes.
 #
-# Re-read /proc/mtd on the device before changing these.
+# The version of this script carried over from OpenIPC checked rootfs against a
+# flat 8MB and did not check the kernel at all. Neither is right here: the chip
+# is 16MB but the rootfs partition is 5 or 8MB of it, so the limit cannot be
+# derived from the flash size. Getting it wrong moves the failure from the
+# build, where it is a number, to the flash, where it is a camera in an unknown
+# state -- flashcp just refuses with "bigger than /dev/mtd3".
 
 set -eu
 
@@ -60,7 +71,15 @@ BINARIES_DIR="$1"
 IMAGE_NAME="ssc30kq_${OPENIPC_VARIANT:-image}"
 
 KERNEL_LIMIT=$((2048 * 1024))
-ROOTFS_LIMIT=$((5120 * 1024))
+
+# Mirror cmd_sf.c: the partition U-Boot will hand us depends on the image size.
+rootfs_limit_for() {
+	if [ $(($1 + 0x1000)) -lt $((0x500000)) ]; then
+		echo $((5120 * 1024))
+	else
+		echo $((8192 * 1024))
+	fi
+}
 
 rc=0
 
@@ -96,6 +115,14 @@ check() {
 }
 
 check "uImage" "$BINARIES_DIR/uImage" "$KERNEL_LIMIT" || rc=1
-check "rootfs.squashfs" "$BINARIES_DIR/rootfs.squashfs" "$ROOTFS_LIMIT" || rc=1
+
+ROOTFS_BIN="$BINARIES_DIR/rootfs.squashfs"
+if [ -f "$ROOTFS_BIN" ]; then
+	ROOTFS_LIMIT=$(rootfs_limit_for "$(wc -c <"$ROOTFS_BIN")")
+	echo "$IMAGE_NAME rootfs partition will be $((ROOTFS_LIMIT / 1024))KB (sf probe sizes it from the image)"
+else
+	ROOTFS_LIMIT=$((5120 * 1024))
+fi
+check "rootfs.squashfs" "$ROOTFS_BIN" "$ROOTFS_LIMIT" || rc=1
 
 exit $rc
