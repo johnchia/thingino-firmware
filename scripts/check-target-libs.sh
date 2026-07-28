@@ -87,4 +87,77 @@ else
 	echo "or naming it in BR2_TOOLCHAIN_EXTRA_LIBS so it is copied to the target."
 fi
 
+# ── Second pass: per-package copies that disagree ────────────────────────────
+#
+# A library can be present and still be the WRONG BUILD. Under per-package
+# directories each package gets a private target/ seeded from its dependencies
+# at its own build time, and target-finalize rsyncs them all into the real
+# target. So after a library is rebuilt, any package whose private dir was
+# populated earlier still holds the old copy -- and if it sorts later in the
+# rsync, it silently overwrites the new one.
+#
+# The build is green, the build directory holds a correct library, and the image
+# holds a stale one. It surfaces as a runtime "undefined symbol" for something
+# the library visibly provides. Twice here: libjson-c, and libmbedtls rebuilt
+# with MBEDTLS_SSL_DTLS_SRTP, where rwd died on
+# mbedtls_ssl_conf_dtls_srtp_protection_profiles.
+#
+# Compare the per-package copies against EACH OTHER, not against the installed
+# file: target libraries are stripped at finalize, so they never match byte for
+# byte and comparing to them reports every library in the tree. Disagreement
+# between two private copies is the real signal -- it means the rsync had a
+# choice to make.
+PPD="$(dirname "$TARGET")/per-package"
+if [ -d "$PPD" ]; then
+	# One traversal of the whole per-package tree, then group by relative path.
+	# Doing a find per library instead is O(libs x tree) and takes minutes.
+	report="$(
+		find "$PPD" -type f \( -path '*/target/lib/*.so*' \
+			-o -path '*/target/usr/lib/*.so*' \) -print0 2>/dev/null |
+		xargs -0 -r md5sum 2>/dev/null |
+		awk -v ppd="$PPD/" '
+			{
+				sum = $1
+				path = $0
+				sub(/^[^ ]+  /, "", path)
+				rest = substr(path, length(ppd) + 1)
+				slash = index(rest, "/")
+				pkg = substr(rest, 1, slash - 1)
+				rel = rest
+				sub(/^[^\/]+\/target\//, "", rel)
+				key = rel
+				if (!(key in seen)) { order[++n] = key }
+				seen[key] = 1
+				sums[key, sum] = 1
+				if (!((key SUBSEP sum) in listed)) {
+					listed[key SUBSEP sum] = 1
+					distinct[key]++
+				}
+				pkgs[key, sum] = pkgs[key, sum] " " pkg
+			}
+			END {
+				for (i = 1; i <= n; i++) {
+					k = order[i]
+					if (distinct[k] < 2) continue
+					printf "check-target-libs: DISAGREEMENT %s\n", k
+					for (c in sums) {
+						split(c, a, SUBSEP)
+						if (a[1] != k) continue
+						printf "    %s %s\n", substr(a[2], 1, 8), pkgs[k, a[2]]
+					}
+				}
+			}'
+	)"
+	if [ -n "$report" ]; then
+		printf '%s\n' "$report"
+		echo
+		echo "Those packages hold different builds of the same library. Whichever"
+		echo "sorts last in the finalize rsync wins, which may not be the newest."
+		echo "Dirclean the ones carrying the old build: make CAMERA=<cam> br-<pkg>-dirclean"
+		rc=1
+	else
+		echo "check-target-libs: OK -- per-package library copies all agree"
+	fi
+fi
+
 exit $rc
