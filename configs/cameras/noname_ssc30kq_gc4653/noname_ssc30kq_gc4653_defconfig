@@ -140,4 +140,62 @@ BR2_PACKAGE_THINGINO_RAPTOR_RIC=y
 BR2_PACKAGE_THINGINO_RAPTOR_RHD=y
 # BR2_PACKAGE_THINGINO_RAPTOR_RAC is not set
 
+# Stream geometry and the sensor settings this board was brought up with.
+#
+# These are NOT optional decoration. The raptor package installs the generic
+# config/raptor.conf, in which every one of these keys is commented out, and
+# rvd's own fallback for a missing stream0 width is 1920 -- so leaving this
+# block out does not produce "the sensor's native resolution", it produces a
+# silent 1920x1080 at 25fps from a 2560x1440 sensor.
+#
+# The values come from config/raptor-ssc30kq.conf in the raptor fork, which is
+# the file this hardware was actually brought up against. They are set through
+# thingino's own Kconfig knobs rather than by installing that file, because on
+# thingino the two things it carries have better homes: geometry belongs here,
+# where a reader looking at the board looks, and its hardcoded IR-cut GPIO pins
+# belong in thingino.json -- ric reads them from there automatically, and that
+# file's absence on OpenIPC is the only reason they were ever in raptor.conf.
+#
+# The patcher (thingino-raptor-conf.mk) rewrites commented keys in place, so
+# setting a value here both uncomments and sets it. Keys left empty are skipped
+# entirely, which is why the rest of raptor.conf is untouched.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_WIDTH="2560"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_HEIGHT="1440"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_FPS="30"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_CODEC="h264"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_PROFILE="2"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_BITRATE="4000000"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_RC_MODE="cbr"
+# 2 seconds at 30fps.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_GOP="60"
+# MJPEG is wired in the SigmaStar encoder but was never verified on hardware,
+# so it stays off rather than shipping a snapshot path nobody has looked at.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_JPEG_FALSE=y
+
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_ENABLED_TRUE=y
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_WIDTH="640"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_HEIGHT="360"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_FPS="5"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_CODEC="h264"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_PROFILE="2"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_BITRATE="1000000"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_RC_MODE="cbr"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_GOP="30"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_OSD_ENABLED_FALSE=y
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_JPEG_FALSE=y
+
+# 50Hz mains. antiflicker is the ISP's flicker-avoidance mode, not a boolean.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_SENSOR_ANTIFLICKER="2"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_SENSOR_LOW_LATENCY_FALSE=y
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_RING_REFMODE_FALSE=y
+
+# [image] is deliberately left entirely at defaults, and that is a decision
+# rather than an omission. load_sigmastar hands the ISP the tuned
+# /etc/sensors/<sensor>.bin, which replaces the generic iqfile0.bin CUS3A would
+# otherwise pick up. With a tuned file in effect the right thing for the image
+# knobs to do is nothing: the backend treats a knob left at its neutral 128 as
+# "leave this module on auto", so the tuning file's own curves stay in charge.
+# Setting one switches that module to manual and pins it -- useful for a
+# deliberate adjustment, counterproductive as a default.
+
 BR2_PACKAGE_DROPBEAR=y

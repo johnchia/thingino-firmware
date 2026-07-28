@@ -226,7 +226,7 @@ endef
 # does not. Buildroot reads _VERSION and _SITE when generic-package is
 # evaluated, which is the line below, so this is still in time.
 ifeq ($(BR2_SOC_SIGMASTAR),y)
-THINGINO_RAPTOR_VERSION = 04f19b5c4c7558cb7eafc4fd0cd81e11c75c38ce
+THINGINO_RAPTOR_VERSION = 8623cb206a58a26084374c98e602d576fd0c4989
 THINGINO_RAPTOR_SITE = https://github.com/johnchia/raptor
 endif
 
