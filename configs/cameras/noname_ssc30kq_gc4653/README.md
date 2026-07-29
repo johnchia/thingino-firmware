@@ -96,7 +96,14 @@ open ring reaches the 503. So the `jpeg1` ring exists and rhd waits two seconds
 on it for nothing. The fault is between the bind and the ring write, not in the
 web layer — this CGI only relays it.
 
-Handed off in `~/raptor/STREAM1-JPEG-NOT-A-PORT-BUDGET.md`. The open question
-there is whether stream 1's H.264 video works at all, which splits it into "the
-JPEG clone of port 1 is broken" or "the whole stream-1 pipeline is". Untested
-either way.
+Stream 1's H.264 video is fine — both RTSP streams decode real frames — so VPE
+port 1 produces normally and only the JPEG clone of it is broken. Holding an
+MJPEG connection on stream 1 for 25 seconds yields zero bytes, so nothing ever
+writes to the `jpeg1` ring; it is not a slow start.
+
+Handed off in `~/raptor/STREAM1-JPEG-NOT-A-PORT-BUDGET.md`.
+
+Separately, the first `/snap?stream=0` against an idle encoder can return a
+spurious 503 while the next one succeeds — the on-demand encoder cold-starts
+slower than the two seconds rhd waits. It affects the working path too, so a
+first preview load may show a broken image. Also in the handoff.
