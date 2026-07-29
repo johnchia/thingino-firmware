@@ -64,27 +64,35 @@ name the UI hardcodes, with channel and disposition derived from the name.
 
 Retire it if that deferred item ever lands.
 
-### Known broken, deferred
+### Stream 1 JPEG — fix pinned, awaiting a board test
 
-Verified on hardware 2026-07-28: `/x/ch0.jpg` and `/x/ch0.mjpg` work.
+`/x/ch0.jpg` and `/x/ch0.mjpg` are verified working on hardware. Stream 1 was
+not: `/snap?stream=1` failed on rhd directly, so the `ch1` proxies failed only
+by relaying it faithfully. The fault was never in the web layer.
 
-**Stream 1 produces no JPEG.** `/snap?stream=1` fails on rhd directly, and
-`/x/ch1.jpg` / `/x/ch1.mjpg` fail because the proxy faithfully relays that.
-Stream 0 works by every route. One fault, in raptor, not in the web layer —
-this CGI is only the messenger.
+The cause was a port budget. This board runs two video streams with `jpeg =
+true` on both, so it wants four VPE ports, and `STAR_VPE_PORT_NUM` is 4. The
+first snapshot fix (raptor-hal `7a23962`) gave every JPEG channel a port of its
+own and gave up when it could not get one, which is why stream 1 had a snapshot
+ring with nothing feeding it.
 
-Where to look: stream 1 is 640x360 @ 5 fps with `jpeg = true`, so this board
-wants four VPE ports (2 video + 2 JPEG) and `STAR_VPE_PORT_NUM` is exactly 4.
-The snapshot-port fix (raptor-hal `7a23962`) was only ever confirmed on stream
-0, and its dedicated-port design is the part most likely to run out of room or
-mis-clone geometry for the second JPEG channel.
+raptor-hal `86e7cb4`, pinned here, keeps the dedicated port as the preferred
+shape but falls back to sharing the paired video stream's port when none is
+free. **Not yet confirmed on hardware** — it is a predicted fix. One command
+tells the three outcomes apart:
 
 ```
-logread | grep -e 'bind: VPE port' -e 'snapshot channel attached'
+logread | grep -e 'bind: VPE port' -e 'snapshot channel'
 ```
 
-Expect four binds and two `snapshot channel attached` lines; a missing fourth
-bind or a second attach that never appears localises it immediately. Hand the
-result to the raptor agent rather than working around it here.
+- `snapshot channel attached on VPE port 3` — a fourth port did exist and the
+  original design was mis-sequenced; keep the log, the raptor agent wants it.
+- `snapshot channel sharing chn 1's VPE port 1` — fallback took; snapshots
+  should now work on both streams.
+- `sharing chn 1's VPE port 1 failed too` — MI enforces one bind per source
+  port. The fix then needs a different shape, and the MI error code is what
+  identifies it.
 
-Deferred — does not block the UI.
+If stream-1 snapshots arrive at full sensor rate instead of 1 fps, the fallback
+works but MI is not honouring `dstFps` on a second bind of one source; that is
+a pacing question for the raptor agent, not a failure of this proxy.
