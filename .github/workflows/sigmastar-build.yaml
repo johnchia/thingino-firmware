@@ -16,9 +16,16 @@ on:
   push:
     branches:
       - sigmastar-infinity6e
+    # A build takes ~45 minutes cold. Documentation cannot change the image, and
+    # this fork carries a lot of it. GitHub skips the run only when every changed
+    # path matches, so a commit touching both docs and code still builds.
+    paths-ignore:
+      - '**.md'
   pull_request:
     branches:
       - sigmastar-infinity6e
+    paths-ignore:
+      - '**.md'
   workflow_dispatch:
     inputs:
       camera:
@@ -26,6 +33,12 @@ on:
         description: 'Camera config to build'
         required: false
         default: 'noname_ssc30kq_gc4653'
+
+# Only the newest push to a branch is worth building; a superseded run is
+# answering a question nobody is asking any more.
+concurrency:
+  group: sigmastar-build-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   BR2_DL_DIR: ~/dl
