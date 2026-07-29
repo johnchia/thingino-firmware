@@ -78,21 +78,25 @@ ring with nothing feeding it.
 
 raptor-hal `86e7cb4`, pinned here, keeps the dedicated port as the preferred
 shape but falls back to sharing the paired video stream's port when none is
-free. **Not yet confirmed on hardware** — it is a predicted fix. One command
-tells the three outcomes apart:
+free. **The board says that was not the cause.** All four VPE ports bind and
+both JPEG channels attach to a port of their own, so the fallback is never
+reached and stream 1 is still dead:
 
 ```
-logread | grep -e 'bind: VPE port' -e 'snapshot channel'
+bind: VPE port 3 -> VENC chn 3, framebase, 5 -> 1 fps
+venc chn 3: snapshot channel attached on VPE port 3, cloned from chn 1's port 1
 ```
 
-- `snapshot channel attached on VPE port 3` — a fourth port did exist and the
-  original design was mis-sequenced; keep the log, the raptor agent wants it.
-- `snapshot channel sharing chn 1's VPE port 1` — fallback took; snapshots
-  should now work on both streams.
-- `sharing chn 1's VPE port 1 failed too` — MI enforces one bind per source
-  port. The fix then needs a different shape, and the MI error code is what
-  identifies it.
+The pin stays — the fallback is sound robustness for a board that genuinely
+runs out of ports, it just does not fix this.
 
-If stream-1 snapshots arrive at full sensor rate instead of 1 fps, the fallback
-works but MI is not honouring `dstFps` on a second bind of one source; that is
-a pacing question for the raptor agent, not a failure of this proxy.
+What the board narrows it to: rhd answers `/snap?stream=1` with 503 "No
+snapshot available yet" rather than 404 "Stream not available", and only an
+open ring reaches the 503. So the `jpeg1` ring exists and rhd waits two seconds
+on it for nothing. The fault is between the bind and the ring write, not in the
+web layer — this CGI only relays it.
+
+Handed off in `~/raptor/STREAM1-JPEG-NOT-A-PORT-BUDGET.md`. The open question
+there is whether stream 1's H.264 video works at all, which splits it into "the
+JPEG clone of port 1 is broken" or "the whole stream-1 pipeline is". Untested
+either way.
