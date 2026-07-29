@@ -1,0 +1,125 @@
+name: sigmastar-build
+
+# Build-only CI for the SigmaStar Infinity6E fork.
+#
+# This exists because the fork's primary risk is not merge conflicts, it is
+# silent semantic drift: upstream adds an application-layer feature that quietly
+# assumes Ingenic, nothing conflicts, and the board breaks. A merge that still
+# builds is the cheapest signal that catches part of that, and it is the scaffold
+# the boot test hangs on later.
+#
+# Separate file rather than a matrix entry in firmware-builder.yml on purpose --
+# a new file has no merge surface against upstream, which is the same discipline
+# the rest of the fork follows.
+
+on:
+  push:
+    branches:
+      - sigmastar-infinity6e
+  pull_request:
+    branches:
+      - sigmastar-infinity6e
+  workflow_dispatch:
+    inputs:
+      camera:
+        type: string
+        description: 'Camera config to build'
+        required: false
+        default: 'noname_ssc30kq_gc4653'
+
+env:
+  BR2_DL_DIR: ~/dl
+  FORCE_UNSAFE_CONFIGURE: 1
+  TERM: linux
+  TZ: UTC
+
+jobs:
+  build:
+    name: ${{ github.event.inputs.camera || 'noname_ssc30kq_gc4653' }}
+    runs-on: ubuntu-26.04
+    # A cold cache builds the whole external-toolchain userspace; upstream's
+    # 30 minutes assumes a warm dl cache it populates from its own registry.
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: ghcr.io/themactep/thingino-builder-image:latest
+      options: --user root
+
+    steps:
+      - name: Setup gh workspace to container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Use GNU coreutils install (workaround for uutils bug)
+        run: update-alternatives --install /usr/bin/install install /usr/bin/gnuinstall 100 || true
+
+      - name: Checkout repository source
+        uses: actions/checkout@v5
+        with:
+          submodules: 'true'
+          fetch-depth: '1'
+
+      - name: Configure environment variables
+        run: |
+          echo "CAMERA=${{ github.event.inputs.camera || 'noname_ssc30kq_gc4653' }}" >> $GITHUB_ENV
+          echo "WEEK_NUMBER=$(date +%U)" >> $GITHUB_ENV
+          echo "CURRENT_YEAR=$(date +%Y)" >> $GITHUB_ENV
+
+      - name: Setup cache directories
+        run: mkdir -p ~/.buildroot-ccache ~/dl
+
+      - name: Restore ccache
+        uses: actions/cache@v5
+        if: always()
+        with:
+          path: ~/.buildroot-ccache
+          key: ${{ runner.os }}-sigmastar-ccache-${{ env.CAMERA }}-${{ env.CURRENT_YEAR }}-week-${{ env.WEEK_NUMBER }}
+          restore-keys: |
+            ${{ runner.os }}-sigmastar-ccache-${{ env.CAMERA }}-${{ env.CURRENT_YEAR }}-
+            ${{ runner.os }}-sigmastar-ccache-${{ env.CAMERA }}-
+
+      # Downloads only, so a stale entry is never wrong, only incomplete. Keyed
+      # loosely on purpose: the point is to avoid refetching the ARM toolchain
+      # and the vendor osdrv tarball on every run.
+      - name: Restore download cache
+        uses: actions/cache@v5
+        with:
+          path: ~/dl
+          key: ${{ runner.os }}-sigmastar-dl-${{ env.CURRENT_YEAR }}-week-${{ env.WEEK_NUMBER }}
+          restore-keys: |
+            ${{ runner.os }}-sigmastar-dl-${{ env.CURRENT_YEAR }}-
+            ${{ runner.os }}-sigmastar-dl-
+
+      # br-all rather than upstream's `fast` target: br-all runs the post-image
+      # script, which is what enforces the kernel and rootfs partition limits.
+      # The kernel sits at 98% of its partition, so a size regression is a real
+      # and likely failure mode, and it is only caught here.
+      - name: Build firmware
+        run: make CAMERA="$CAMERA" br-all WORKFLOW=1
+
+      # A build can link a library that is not in the image, or ship a stale
+      # per-package copy over a rebuilt one; neither fails the build itself.
+      - name: Check target libraries
+        run: |
+          TARGET=$(echo output/*/"$CAMERA"-*/target)
+          ./scripts/check-target-libs.sh "$TARGET"
+
+      - name: Report image sizes
+        if: always()
+        run: |
+          shopt -s nullglob
+          for f in output/*/"$CAMERA"-*/images/uImage output/*/"$CAMERA"-*/images/rootfs.squashfs; do
+            echo "$(stat -c '%10s  %n' "$f")"
+          done
+
+      - name: Upload images
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.CAMERA }}-images
+          path: |
+            output/*/${{ env.CAMERA }}-*/images/uImage
+            output/*/${{ env.CAMERA }}-*/images/rootfs.squashfs
+          if-no-files-found: error
+          retention-days: 14
