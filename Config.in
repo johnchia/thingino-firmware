@@ -172,11 +172,12 @@ source "$BR2_EXTERNAL_THINGINO_PATH/package/thingino-webui/Config.in"
 # interleaved alphabetically on purpose: upstream adds its own source lines in
 # alphabetical order, so an entry inserted mid-list is sitting exactly where
 # the next upstream package wants to go. Every symbol below is gated on
-# BR2_SOC_SIGMASTAR, so an Ingenic build sees three more invisible options and
+# BR2_SOC_SIGMASTAR, so an Ingenic build sees four more invisible options and
 # nothing else changes.
 source "$BR2_EXTERNAL_THINGINO_PATH/package/ipctool/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-osdrv-infinity6e/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-osdrv-sensors/Config.in"
+source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-uboot/Config.in"
 endif
 
 menuconfig BR2_THINGINO_STREAMER_PACKAGES

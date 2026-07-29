@@ -96,6 +96,7 @@ BINARIES_DIR="$1"
 IMAGE_NAME="ssc30kq_${OPENIPC_VARIANT:-image}"
 
 KERNEL_LIMIT=$((2048 * 1024))
+BOOT_LIMIT=$((256 * 1024))
 
 # Mirror cmd_sf.c: the partition U-Boot will hand us depends on the image size.
 rootfs_limit_for() {
@@ -140,6 +141,16 @@ check() {
 }
 
 check "uImage" "$BINARIES_DIR/uImage" "$KERNEL_LIMIT" || rc=1
+
+# Built only when sigmastar-uboot is selected, and building it is not flashing
+# it -- the board boots whatever is already in mtd0. Checked because it has the
+# least headroom of the three artifacts and its overflow is the one discovered
+# latest: nothing reads it until someone writes the single partition that cannot
+# be recovered in software.
+for boot_bin in "$BINARIES_DIR"/u-boot-*-nor.bin; do
+	[ -f "$boot_bin" ] || continue
+	check "$(basename "$boot_bin")" "$boot_bin" "$BOOT_LIMIT" || rc=1
+done
 
 ROOTFS_BIN="$BINARIES_DIR/rootfs.squashfs"
 if [ -f "$ROOTFS_BIN" ]; then
