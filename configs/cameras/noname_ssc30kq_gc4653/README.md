@@ -64,46 +64,56 @@ name the UI hardcodes, with channel and disposition derived from the name.
 
 Retire it if that deferred item ever lands.
 
-### Stream 1 JPEG — fix pinned, awaiting a board test
+### Stream 1 JPEG — root cause found, fix pinned, awaiting a board test
 
-`/x/ch0.jpg` and `/x/ch0.mjpg` are verified working on hardware. Stream 1 was
-not: `/snap?stream=1` failed on rhd directly, so the `ch1` proxies failed only
-by relaying it faithfully. The fault was never in the web layer.
+Snapshots on stream 1 produced nothing by any route: `/snap?stream=1` returned
+503 and a 25-second MJPEG hold returned zero bytes, while stream 0 worked and
+both H.264 streams delivered video normally. The `ch1` proxies failed only by
+relaying that faithfully — never a web-layer fault.
 
-The cause was a port budget. This board runs two video streams with `jpeg =
-true` on both, so it wants four VPE ports, and `STAR_VPE_PORT_NUM` is 4. The
-first snapshot fix (raptor-hal `7a23962`) gave every JPEG channel a port of its
-own and gave up when it could not get one, which is why stream 1 had a snapshot
-ring with nothing feeding it.
+**The cause was a VPE port that ignored the geometry it was asked for.**
+`MI_VPE_SetPortMode` returns 0 for a size it does not apply: a port configured
+while the VPE channel is already running keeps the *channel's input* size,
+because the scaler only honours the requested output once the port has a crop
+in the input domain. rvd's own ports get one by being configured before the
+channel starts; a snapshot port cloned afterwards does not.
 
-raptor-hal `86e7cb4`, pinned here, keeps the dedicated port as the preferred
-shape but falls back to sharing the paired video stream's port when none is
-free. **The board says that was not the cause.** All four VPE ports bind and
-both JPEG channels attach to a port of their own, so the fallback is never
-reached and stream 1 is still dead:
+So port 3 emitted 2560x1440 into a VENC channel built for 640x360 and the
+encoder produced nothing, while every call in its setup reported success.
+
+**Stream 0 was never correct either.** Port 2 was equally unconfigured and only
+looked right because 2560x1440 is also the channel input size. It has worked by
+coincidence since raptor-hal `7a23962`, so the fix makes the working path
+correct rather than merely restoring parity.
+
+raptor-hal `4360674`, pinned here, sets the crop and then reads the mode back,
+failing the clone rather than trusting the return code. A failed clone falls
+back to sharing the paired video stream's port (`86e7cb4`), which carries the
+right geometry by construction — so that earlier pin is the safety net for
+exactly this, and both earn their place.
+
+The acceptance test is the geometry, not the picture:
 
 ```
-bind: VPE port 3 -> VENC chn 3, framebase, 5 -> 1 fps
-venc chn 3: snapshot channel attached on VPE port 3, cloned from chn 1's port 1
+cat /proc/mi_modules/mi_vpe/mi_vpe0
 ```
 
-The pin stays — the fallback is sound robustness for a board that genuinely
-runs out of ports, it just does not fix this.
+Under **Outputport Info**, port 2 should read 2560x1440 and port 3 **640x360**.
+Snapshots working while port 3 still reads 2560x1440 would mean something else
+is going on.
 
-What the board narrows it to: rhd answers `/snap?stream=1` with 503 "No
-snapshot available yet" rather than 404 "Stream not available", and only an
-open ring reaches the 503. So the `jpeg1` ring exists and rhd waits two seconds
-on it for nothing. The fault is between the bind and the ring write, not in the
-web layer — this CGI only relays it.
+Ruled out along the way, so it is not re-investigated: the port budget (all four
+ports bind and both JPEG channels attach), the `5 -> 1` framebase ratio, and the
+VPE pass (port 3 finished 71 frames at 0.99 fps the whole time).
 
-Stream 1's H.264 video is fine — both RTSP streams decode real frames — so VPE
-port 1 produces normally and only the JPEG clone of it is broken. Holding an
-MJPEG connection on stream 1 for 25 seconds yields zero bytes, so nothing ever
-writes to the `jpeg1` ring; it is not a slow start.
+Full history in `~/raptor/STREAM1-JPEG-NOT-A-PORT-BUDGET.md`.
 
-Handed off in `~/raptor/STREAM1-JPEG-NOT-A-PORT-BUDGET.md`.
+### Known: the first snapshot after an idle period can 503
 
-Separately, the first `/snap?stream=0` against an idle encoder can return a
-spurious 503 while the next one succeeds — the on-demand encoder cold-starts
-slower than the two seconds rhd waits. It affects the working path too, so a
-first preview load may show a broken image. Also in the handoff.
+`/snap` is served inline from rhd's epoll dispatch, so the two-second wait
+blocks the whole event loop and a queued second request measures the sum of
+both. Raising the timeout would therefore make one cold snapshot stall every
+other client — the fix is to park the request on the epoll loop and complete it
+when the ring publishes, which is a change to rhd's request model and is not
+done. Affects stream 0 as well: a first preview load may show a broken image
+that a reload fixes.
