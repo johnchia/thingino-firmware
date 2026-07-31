@@ -38,8 +38,17 @@ The generated `bootargs` carries literal partition sizes and never references
 `${rootmtd}`. The stock OpenIPC bootloader's `sf probe` still recomputes
 `rootmtd` and `rootsize` on every boot, but nothing in this boot path reads
 them, so it writes two variables into the void and the boot proceeds on our
-table. (`rootsize` is used by `run urnor` for TFTP rootfs writes; that one path
-is wrong until mtd0 is replaced.)
+table. Traced against a real image: `sf probe` reads our squashfs superblock at
+0x250000, matches the magic, and sets `rootmtd=8192k` and `rootsize=0x500000`.
+
+`rootmtd` is referenced by nothing once `bootargs` stops using it. `rootsize` is
+read by `run urnor` for TFTP rootfs writes, so that helper erases 5120k instead
+of the real partition size until mtd0 is replaced -- the only thing the quirk
+still breaks.
+
+`${memlx}` and `${memsz}` do not come from the stored environment at all.
+`board_late_init()` in `infinity6e/chip.c` sets them from the detected RAM size,
+and it runs before `main_loop()`, so they are present whatever is in mtd1.
 
 That is what makes a staged bring-up possible: the whole partition change can be
 proven with the OEM bootloader still in mtd0 and the SPI clip still in the
@@ -61,9 +70,18 @@ that overlay and will not survive — copy it off first.
 
 ## Stage 1 — the table, keeping the OEM bootloader (recoverable)
 
-Prefer `fw_setenv` over writing `u-boot-env.bin` raw: it is a read-modify-write,
-so `ethaddr`, `sensor` and anything else per-unit stay where they are. Apply
-every line of `uenv.txt`:
+Use `fw_setenv`, not a raw write of `u-boot-env.bin`. A stored environment
+replaces the bootloader's compiled defaults wholesale rather than merging with
+them, and `u-boot-env.bin` holds only the ten variables this build generates.
+Writing it raw therefore discards everything else the unit's environment
+currently has — `ethaddr` and `sensor`, but also the vendor's `soc`,
+`updatetool` and the `ubnor`/`uknor`/`urnor` TFTP recovery helpers, which are
+exactly what you want available when a flash goes wrong. The camera would still
+boot, because the generated `bootcmd` is self-contained; it would just have lost
+its recovery tooling.
+
+`fw_setenv` is a read-modify-write, so all of that stays. Apply every line of
+`uenv.txt`:
 
 ```sh
 while IFS='=' read -r k v; do fw_setenv "$k" "$v"; done < uenv.txt
