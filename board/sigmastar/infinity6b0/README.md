@@ -21,12 +21,35 @@ make CAMERA=noname_ssc333_rtl8188ftv br-all WORKFLOW=1
 
 In `output/ssc333-infinity6b0/noname_ssc333_rtl8188ftv-4.9-musl/images/`:
 
-| file | what |
-|---|---|
-| `thingino-noname_ssc333_rtl8188ftv.bin` | the full image — boot + env + kernel + rootfs |
-| `u-boot-ssc333-nor.bin` | the boot container alone, 256KB |
-| `u-boot-env.bin` | the environment alone, 64KB, carrying the partition table |
-| `uImage`, `rootfs.squashfs` | the pieces, if a partition-at-a-time write is ever wanted |
+| file | size | what |
+|---|---|---|
+| `thingino-noname_ssc333_rtl8188ftv.bin` | 6,029,312 | the full image — boot + env + kernel + rootfs |
+| `u-boot-ssc333-nor.bin` | 244,624 | the boot container alone, 93% of its 256KB partition |
+| `u-boot-env.bin` | 65,536 | the environment alone, carrying the partition table |
+| `uImage` | 2,178,608 | |
+| `rootfs.squashfs` | 3,432,448 | |
+| `uenv.txt` | | the environment as text, i.e. what was flashed |
+
+The table it generates for an 8MB part:
+
+```
+NOR_FLASH:256k(boot),64k(env),2176k(kernel),3392k(rootfs),2304k(data),8192k@0(all)
+```
+
+That leaves **2304KB of overlay**, 28% of the chip. Kernel and rootfs are sized
+to the images, so those two numbers move with every build and the overlay
+absorbs the difference — it is the only figure here that measures anything
+scarce.
+
+Worth watching: the boot container is at 93% of a partition whose size is not
+negotiable (the bootloader is compiled with `CONFIG_ENV_OFFSET 0x40000`). The
+post-image script fails the build if it ever overflows.
+
+The kernel carries `CONFIG_MAC80211=y`, which the Wi-Fi driver package forces
+on through its `LINUX_CONFIG_FIXUPS` even though Realtek's out-of-tree stack is
+cfg80211-based and does not need it. It costs roughly 100KB against the
+Infinity6E kernel. Left alone because changing it means touching a shared
+package for every Ingenic board too; revisit if the overlay ever gets tight.
 
 The full image **stops at the end of the rootfs** rather than padding out to
 8MB. That is deliberate — everything past it is the overlay, which `/init`
@@ -43,6 +66,20 @@ stat -c%s flash-8m.bin        # expect 8388608
 
 `truncate -s 8M` is the wrong tool here: it pads with `0x00`, which the JFFS2
 formatter has to erase anyway and which makes a dump harder to read.
+
+Sanity-check the padded file before it goes near the chip. Each of these is a
+piece landing exactly where the flashed environment says it does, so together
+they check the image against its own partition table:
+
+```sh
+xxd -s 4          -l 4 -p flash-8m.bin    # 49504c5f  "IPL_"   boot container
+xxd -s 0x50000    -l 4 -p flash-8m.bin    # 27051956           uImage at kernaddr
+xxd -s 0x270000   -l 4 -p flash-8m.bin    # 68737173  "hsqs"   squashfs at rootaddr
+xxd -s 0x7ffff0   -l 8 -p flash-8m.bin    # ffffffffffffffff   erased tail
+```
+
+The two offsets come from `uenv.txt` (`kernaddr`, `rootaddr`) and move with
+every build, so read them from the file rather than copying them from here.
 
 ## Stage 0 — take the facts off the running board first
 
