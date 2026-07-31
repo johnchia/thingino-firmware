@@ -307,6 +307,28 @@ historical — the 2013.07 U-Boot's compiled table declared
 partial image was flashed without touching mtd0. The generated table dropped it.
 Nothing here is missing it; the feature is off for every board.
 
+The consequence is that **an upgrade keeps nothing.** A full image is written to
+`all`, which spans the whole chip, and stage 2 erases the partition before
+writing it — so `data` goes with everything else, and `data` is the jffs2 volume
+that backs the overlayfs holding every writable file under `/etc`. Settings,
+accounts, ssh host keys and hand-edited files are all overlay diffs and all go.
+The web UI says so on the option it recommends; the "partial update" radio that
+promises to keep the overlay still maps to the disabled `-p` and will fail.
+
+The only path back is manual, and it has to be taken *before* the upgrade: the
+web UI's backup button is `tar -cf - /etc | gzip` streamed to the browser, with
+no restore counterpart, so untarring it afterwards is by hand. (`restore.cgi` is
+unrelated — it copies a single file back from `/rom` to undo an overlay edit.)
+
+This is not a SigmaStar limitation and needs no fix here. It is only worth
+stating because it is what makes a stateless MAC necessary rather than merely
+tidy: an Ingenic camera survives the erase looking identical to a fresh one,
+since everything genuinely per-unit is re-derived from silicon on each boot. On
+this board `ethaddr` lived in the environment and nowhere else, so without the
+die-ID fallback in `S03mac` a routine upgrade would have changed the camera's
+identity on the network. `sensor` needs no equivalent — `load_sigmastar`
+re-probes i2c whenever the variable is empty and writes it back.
+
 ### If the environment is lost
 
 A bad CRC in mtd1 makes the bootloader fall back to its compiled defaults, which
