@@ -164,6 +164,12 @@ BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6B0=y
 # rather than hidden in the package so the cost is visible where the decision
 # was made.
 #
+# Note this narrows ISP *tuning* only. All 18 sensor_*_mipi.ko modules still
+# ship -- they are 236KB raw between them, and dropping the 17 unused ones
+# would save 42KB compressed, which is not worth giving up detection for. So a
+# board with a different sensor still probes and binds; it just runs on ISP
+# defaults instead of a tuned profile. Degraded, not dead.
+#
 # Widen this the moment the space exists, or if this image is ever pointed at
 # another SSC333 board.
 BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6B0_SENSORS="sc3336"
