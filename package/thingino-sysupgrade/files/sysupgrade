@@ -32,7 +32,17 @@ self=$(realpath $0)
 # directory, so upstream's copy persists in the overlay after the run.
 #
 # A tree that patches this script cannot also let it replace itself from a
-# branch that does not carry the patch. -x still exists and is now redundant.
+# branch that does not carry the patch.
+#
+# -x disables it per run, but that is not a substitute: tool-upgrade.cgi maps
+# the web UI's three options to -b, -f and -p and has no way to pass -x, so the
+# flag is reachable only from a shell. Leaving the default on would mean every
+# upgrade through the interface most people use replaces this script with one
+# that rejects this board's images.
+#
+# Disabling is the blunt fix. The better one is to point GH_DL_URL at a branch
+# that does carry the patch, which keeps the field-repair capability this gives
+# up -- worth doing once the fork has its own home to point at.
 selfupdate="false"
 bbapplets="date echo flash_eraseall flashcp killall pidof reboot rm sh sleep sync tail"
 upgrade=""
