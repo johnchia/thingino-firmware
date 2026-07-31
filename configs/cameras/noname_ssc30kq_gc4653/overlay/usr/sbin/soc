@@ -72,18 +72,46 @@ print_soc_clocks() {
 	fi
 }
 
-# The stock helper concatenates four Ingenic efuse words here. Infinity6E does
-# have a die ID (ipctool's sstar_get_die_id reads it at CHIP_ADDR1), but ipcinfo
-# exposes no flag for it -- only -c, -s and -t -- so there is no devmem-free way
-# to reach it from a script.
+# The 48-bit OTP die ID, burned at the fab and read-only. Three consecutive
+# 16-bit RIU registers; only the low half of each is part of the ID, which is
+# the detail a naive port of the Ingenic helper gets wrong -- that one feeds
+# whole 32-bit efuse words into its arithmetic.
 #
-# Print nothing and succeed. Every caller already has a fallback chain:
-# S04hostname:76 falls through to wlan.mac, then ethaddr, then the eth0/wlan0
-# sysfs address, which is what produces the correct hostname on this board
-# today. Emitting a fabricated or constant serial would silently break that
-# chain by satisfying it with a value that is not unique.
+# These addresses are inside the Infinity6E RIU window, unlike the Ingenic ones
+# this file exists to avoid, so they read rather than fault. Verified on
+# hardware: the generation tag reads 0xF1 and the ID is non-degenerate.
+#
+# Two reads have to be rejected rather than used. An all-zero ID means the
+# generation has none (some SigmaStar parts genuinely do not), and an all-ones
+# ID means unprogrammed OTP. Either would be identical on every unit, and a
+# caller that persists what it gets -- S03mac does -- would bake a shared
+# identity into the fleet.
+OTP_GENERATION=0x1F003C00
+OTP_DIE_ID_A=0x1F203158
+OTP_DIE_ID_B=0x1F203154
+OTP_DIE_ID_C=0x1F203150
+
+read_reg16() {
+	v=$(devmem "$1" 32 2>/dev/null) || return 1
+	[ -n "$v" ] || return 1
+	printf '%d' $(( v & 0xFFFF ))
+}
+
 print_serial_number() {
-	:
+	command -v devmem >/dev/null 2>&1 || return 0
+
+	# Refuse to read the ID registers unless this really is an Infinity6E.
+	gen=$(read_reg16 "$OTP_GENERATION") || return 0
+	[ "$gen" = "241" ] || return 0
+
+	a=$(read_reg16 "$OTP_DIE_ID_A") || return 0
+	b=$(read_reg16 "$OTP_DIE_ID_B") || return 0
+	c=$(read_reg16 "$OTP_DIE_ID_C") || return 0
+
+	[ "$a" -eq 0 ] && [ "$b" -eq 0 ] && [ "$c" -eq 0 ] && return 0
+	[ "$a" -eq 65535 ] && [ "$b" -eq 65535 ] && [ "$c" -eq 65535 ] && return 0
+
+	printf '%04X%04X%04X\n' "$a" "$b" "$c"
 }
 
 print_wiki_line() {

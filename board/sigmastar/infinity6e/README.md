@@ -66,18 +66,27 @@ scp thingino-<camera>.bin uenv.txt root@<camera>:/tmp/
 
 ## Before you touch anything
 
-Save the MAC. `ethaddr` is the one value in the environment that nothing can
-reconstruct: `S03mac` reads it rather than inventing a MAC, and this board has
-no equivalent of the Ingenic SoC serial registers that thingino derives one from
-elsewhere.
+Save the MAC:
 
 ```sh
 fw_printenv ethaddr
 ```
 
-`sensor` needs no saving. `load_sigmastar` probes i2c through `ipcinfo` whenever
-the variable is empty and writes the answer back, so an erased environment
-repairs itself on the next boot.
+Losing it is no longer fatal — `S03mac` falls back to a MAC derived from the
+SoC's OTP die ID, which is burned at the fab and not in flash, so a camera that
+comes back from an upgrade with an erased environment still gets a stable
+address rather than a new random one each boot. But the derived address is a
+synthetic locally-administered `02:` one, not the board's assigned MAC, so
+anything holding a DHCP reservation against the real one still wants it back.
+
+`sensor` needs no saving at all. `load_sigmastar` probes i2c through `ipcinfo`
+whenever the variable is empty and writes the answer back, so it repairs itself
+on the next boot.
+
+**Both fallbacks change the hostname.** `S04hostname` builds the name from the
+last four hex digits of `soc -s`, falling back to the MAC, so this unit is
+`ing-noname-ssc30kq-FA37` from the die ID rather than the `-CD96` its assigned
+MAC gave. Worth knowing before an update rather than after.
 
 **The overlay is about to be erased.** `data` moves when the rootfs partition is
 resized, so its jffs2 contents no longer parse and `/init` reformats them.

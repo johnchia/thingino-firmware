@@ -1,6 +1,7 @@
 #!/bin/sh
 #
-# Take the MAC from the vendor U-Boot environment.
+# Take the MAC from the vendor U-Boot environment, falling back to one derived
+# from the SoC die ID.
 #
 # Overrides the shared overlay/etc/init.d/S03mac, which derives a MAC from the
 # Ingenic SoC serial-number registers at 0x13540200-0x1354023C via devmem. That
@@ -12,15 +13,24 @@
 # what it computes, so one bad read becomes a permanently wrong MAC, and an
 # unstable one means a new DHCP lease on every boot.
 #
-# Vendor U-Boot already holds the board's real MAC in `ethaddr` -- it is what
-# the stock firmware and OpenIPC both boot with. Read that instead. Requires the
-# corrected sector size in this camera's fw_env.config to be able to read the
-# env at all.
+# Two sources, in this order, and the order matters.
 #
-# If ethaddr is absent or malformed, do nothing: the EMAC driver keeps whatever
-# MAC U-Boot programmed into it, which is the behaviour on this board today. A
-# missing eth.mac in thingino.json is not an error, it just means nothing
-# overrides the hardware.
+# `ethaddr` is the board's real assigned MAC -- what the stock firmware and
+# OpenIPC both boot with, and what any DHCP reservation was made against. When
+# it is present it is the better answer, so it stays first.
+#
+# It lives in the NOR environment, though, and a full sysupgrade erases the
+# whole chip. Without a second source the camera would come back from an update
+# with no MAC at all. The fallback is the 48-bit OTP die ID, which `soc -s`
+# reads: burned at the fab, not in flash, identical on every boot of a given
+# unit and different between units. It yields a synthetic locally-administered
+# address rather than the assigned one, so it is a floor, not a replacement.
+#
+# The fallback changes the hostname. S04hostname takes the last four hex digits
+# of whatever identifies the unit, so a camera that loses `ethaddr` comes back
+# under a different name. That is worth knowing before an update rather than
+# after, and it is still better than the alternative, which is no MAC and a new
+# random one every boot.
 #
 # wlan.mac is deliberately not derived. This board has no wifi.
 
@@ -31,21 +41,70 @@ command -v jct >/dev/null 2>&1 || exit 0
 # Already set, nothing to do.
 jct "$CONFIG_JSON" get eth.mac >/dev/null 2>&1 && exit 0
 
-command -v fw_printenv >/dev/null 2>&1 || exit 0
-
-eth_mac=$(fw_printenv -n ethaddr 2>/dev/null) || exit 0
-
 # Accept only a well-formed unicast MAC. Rejecting the all-zero and broadcast
 # addresses matters because U-Boot will happily report either.
-case "$eth_mac" in
-	[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]) ;;
-	*) exit 0 ;;
-esac
+mac_is_sane() {
+	case "$1" in
+		[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]) ;;
+		*) return 1 ;;
+	esac
 
-case "$eth_mac" in
-	00:00:00:00:00:00 | [fF][fF]:[fF][fF]:[fF][fF]:[fF][fF]:[fF][fF]:[fF][fF]) exit 0 ;;
-esac
+	case "$1" in
+		00:00:00:00:00:00 | [fF][fF]:[fF][fF]:[fF][fF]:[fF][fF]:[fF][fF]:[fF][fF]) return 1 ;;
+	esac
 
-echo -c 240 -e "- ETH MAC from U-Boot env: $eth_mac"
+	return 0
+}
+
+# 48 bits of die ID into 40 bits of address, because the 02: prefix is fixed by
+# thingino's convention and costs a byte. The high word is lot and wafer and is
+# the least varying of the three, so it is the one folded; the low two words
+# carry the per-die X/Y and come through whole.
+#
+# The last byte is forced odd so that a wlan.mac of eth.mac + 1 can never carry
+# into the byte above. This board has no wifi, but the convention is shared and
+# breaking it here would surprise the next SigmaStar camera.
+mac_from_die_id() {
+	die_id=$(soc -s 2>/dev/null) || return 1
+	[ ${#die_id} -eq 12 ] || return 1
+
+	a=$(printf '%d' "0x${die_id%????????}")
+	b=$(printf '%d' "0x$(echo "$die_id" | cut -c5-8)")
+	c=$(printf '%d' "0x$(echo "$die_id" | cut -c9-12)")
+
+	m1=$(( ((a >> 8) ^ (a & 255)) & 255 ))
+	m2=$(( (b >> 8) & 255 ))
+	m3=$(( b & 255 ))
+	m4=$(( (c >> 8) & 255 ))
+	m5=$(( (c & 255) | 1 ))
+
+	printf '02:%02x:%02x:%02x:%02x:%02x\n' "$m1" "$m2" "$m3" "$m4" "$m5"
+}
+
+eth_mac=""
+source=""
+
+if command -v fw_printenv >/dev/null 2>&1; then
+	candidate=$(fw_printenv -n ethaddr 2>/dev/null)
+	if mac_is_sane "$candidate"; then
+		eth_mac="$candidate"
+		source="U-Boot env"
+	fi
+fi
+
+if [ -z "$eth_mac" ]; then
+	candidate=$(mac_from_die_id)
+	if mac_is_sane "$candidate"; then
+		eth_mac="$candidate"
+		source="SoC die ID"
+	fi
+fi
+
+# Nothing usable. Do nothing rather than invent one: the EMAC keeps whatever MAC
+# U-Boot programmed into it, and a missing eth.mac in thingino.json is not an
+# error, it just means nothing overrides the hardware.
+[ -n "$eth_mac" ] || exit 0
+
+echo -c 240 -e "- ETH MAC from $source: $eth_mac"
 
 jct "$CONFIG_JSON" set eth.mac "$eth_mac"
