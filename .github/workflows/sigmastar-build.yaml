@@ -135,5 +135,7 @@ jobs:
             output/*/${{ env.CAMERA }}-*/images/uImage
             output/*/${{ env.CAMERA }}-*/images/rootfs.squashfs
             output/*/${{ env.CAMERA }}-*/images/u-boot-*-nor.bin
+            output/*/${{ env.CAMERA }}-*/images/u-boot-env.bin
+            output/*/${{ env.CAMERA }}-*/images/uenv.txt
           if-no-files-found: error
           retention-days: 14

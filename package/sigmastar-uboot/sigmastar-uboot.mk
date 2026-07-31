@@ -49,6 +49,14 @@ ifeq ($(SIGMASTAR_UBOOT_SOC_FAMILY),)
 $(error sigmastar-uboot: SOC_FAMILY is empty -- expected it exported by thingino.mk)
 endif
 
+# For mkenvimage, which the post-image script uses to build the environment
+# image describing the partition table. host-uboot-tools installs it
+# unconditionally. BR2_PACKAGE_HOST_UBOOT_TOOLS_ENVIMAGE is a different thing
+# and not what is wanted here -- it asks Buildroot to generate an environment
+# image from a static source file, which cannot express a table whose sizes
+# come from the images this build produces.
+SIGMASTAR_UBOOT_DEPENDENCIES = host-uboot-tools
+
 SIGMASTAR_UBOOT_MAKE_ENV = ARCH=arm CROSS_COMPILE="$(TARGET_CROSS)"
 
 define SIGMASTAR_UBOOT_CONFIGURE_CMDS

@@ -1,115 +1,73 @@
 #!/bin/sh
 #
-# Check the built images against the SSC30KQ's vendor partition table.
+# Size the SSC30KQ's flash partitions to the built images and emit the U-Boot
+# environment that describes them.
 #
-# The table comes from the U-Boot bootargs (CONFIG_MTD_CMDLINE_PARTS=y,
-# CONFIG_MTD_OF_PARTS unset), not from the device tree:
+# The partition table is a property of the environment, not of the board. The
+# kernel takes it from the cmdline (CONFIG_MTD_CMDLINE_PARTS=y,
+# CONFIG_MTD_OF_PARTS unset), U-Boot builds the cmdline from ${bootargs}, and
+# this script writes ${bootargs}. Nothing reads a device tree for it.
 #
-#   mtdparts=NOR_FLASH:256k(boot),64k(env),2048k(kernel),${rootmtd}(rootfs),-(rootfs_data)
+#   mtd0  "boot"     256KB   fixed -- mask-ROM container, see sigmastar-uboot.mk
+#   mtd1  "env"       64KB   fixed -- must match the bootloader's CONFIG_ENV_*
+#   mtd2  "kernel"           sized to uImage, 64KB-aligned
+#   mtd3  "rootfs"           sized to rootfs.squashfs, 64KB-aligned
+#   mtd4  "data"             the remainder; jffs2 overlay upperdir
+#   mtd5  "all"       16MB   whole chip at offset 0, overlapping the rest
 #
-# Note ${rootmtd}: the rootfs size is a U-Boot *variable*, not a literal, and
-# rootfs_data is the "-" catch-all that absorbs whatever is left. So this layout
-# is retuned by `fw_setenv rootmtd <size>` alone -- no bootargs edit, and the
-# kernel load path (bootcmd's ${kernaddr}/${kernsize}) is never touched.
+# The two fixed sizes are not free choices. The bootloader is compiled with
+# CONFIG_ENV_OFFSET 0x40000 and CONFIG_ENV_SIZE 0x10000, so "boot" must be
+# exactly 256KB and "env" exactly 64KB or the environment is read from the
+# wrong place. Changing either means changing sstar-common.h to match.
 #
-# ${rootmtd} is NOT read from the stored environment. OpenIPC's U-Boot
-# (github.com/openipc/u-boot-sigmastar) re-derives it on every boot, in
-# common/cmd_sf.c's `sf probe`:
+# "all" is what thingino-sysupgrade requires: check_upgrade_partitions() hard
+# fails without a partition named "all", and a full image is flashed to it --
+# which is to say a full sysupgrade rewrites the bootloader, and is only
+# meaningful because the bootloader in that image is one we build.
 #
-#   spi_flash_read(flash, CONFIG_ENV_ROOTADDR, sizeof(buf), buf);
-#   memcpy(&magic, &buf[0],  sizeof(magic));
-#   memcpy(&bytes, &buf[40], sizeof(bytes));
-#   if (magic == 0x73717368)                  /* "hsqs", squashfs superblock */
-#       if (bytes + 0x1000 < 0x500000) setenv("rootmtd", "5120k");
-#       else                           setenv("rootmtd", "8192k");
+# ("upgrade", which sysupgrade also looks for, is deliberately absent. It is
+# declared in no mtdparts anywhere in this tree, upstream included, so the
+# partial-upgrade-from-GitHub path dies on every thingino board equally. It is
+# not something this port is missing.)
 #
-# It reads the squashfs superblock at the rootfs offset and sizes the partition
-# from bytes_used. bootcmd begins with `sf probe 0`, so this runs before
-# `run setargs` expands ${rootmtd}. Whatever is in the stored env is overwritten
-# in RAM every boot -- `fw_setenv rootmtd` can never take effect, on any unit.
-# (A stored 8192k is a fossil: CONFIG_BOOTCOMMAND does `sf probe 0; saveenv`, so
-# a first boot with a larger image persisted it once and nothing rewrote it.)
+# "data" replaces the OEM's "rootfs_data". The name matters: /init matches the
+# overlay partition with a loose /data/ in mount_jffs2 but a strict /"data"/ in
+# format_overlay, so under the OEM name the format-on-corruption recovery path
+# resolves to an empty device and fails.
 #
-# So the rootfs partition auto-sizes to the image, and the limit is a function
-# of the image rather than a constant.
+# SIZING THE KERNEL AND ROOTFS PARTITIONS TO THE IMAGES MOVES THE OFFSET OF
+# EVERY PARTITION AFTER THEM. The environment written here describes one exact
+# set of images. Flashing a kernel that crosses a 64KB boundary without
+# reflashing the environment leaves the table describing the previous image,
+# and the rootfs offset then points into the middle of nothing. Kernel, rootfs
+# and environment are flashed together or not at all.
 #
-# THE AUTO-SIZING IS RETROSPECTIVE, NOT PROSPECTIVE, and an earlier version of
-# this comment got that wrong. `sf probe` sizes the partition from the squashfs
-# superblock ALREADY IN FLASH -- it describes the image that is there, not the
-# one you are about to write. So the first image to cross the threshold cannot
-# simply be flashed: mtd3 is still 5120k at that moment and flashcp refuses it
-# with "rootfs.squashfs bigger than /dev/mtd3". The growth is a one-time
-# bootstrap, paid once per unit:
-#
-#   dd if=rootfs.squashfs of=/dev/mtdblock3 bs=4096 count=1280
-#   dd if=rootfs.squashfs of=/dev/mtdblock4 bs=4096 skip=1280
-#
-# i.e. split the write across mtd3 and mtd4 at the old 5120k boundary, since
-# the two are contiguous in flash. The next boot's `sf probe` then reads the
-# superblock of the now-complete image, sets rootmtd=8192k, and every later
-# flash is a plain `flashcp -v rootfs.squashfs /dev/mtd3`.
-#
-# Erase mtd4 only AFTER that resize boot -- its offset moves when rootfs grows,
-# so erasing first erases the wrong region.
-#
-#   mtd0  "boot"          256KB
-#   mtd1  "env"            64KB
-#   mtd2  "kernel"       2048KB   <- uImage goes here
-#   mtd3  "rootfs"    5120/8192KB <- rootfs.squashfs here; sized by sf probe
-#   mtd4  "rootfs_data"      rest <- jffs2 overlay upperdir, the "-" remainder
-#
-# Note mtd4's offset therefore moves with the rootfs size. Erase it after the
-# rootfs is flashed and after the reboot that resizes the partition, not before.
-#
-# ROOTFS_LIMIT below mirrors the U-Boot arithmetic exactly rather than
-# hardcoding either value, so it stays correct as the image grows.
-#
-# THIS IS A PROPERTY OF OPENIPC'S BOOTLOADER, NOT OF THE BOARD. The auto-sizing
-# is code in OpenIPC's cmd_sf.c; mainline U-Boot and SigmaStar's vendor tree do
-# not do it. When we build our own U-Boot and move to thingino's partition
-# table, the rootfs partition gets sized to the built image at *build* time,
-# this whole mechanism becomes redundant and then wrong, and rootfs_limit_for()
-# must be deleted in the same commit -- otherwise the build keeps enforcing a
-# limit that no longer describes the device, silently and permissively.
-#
-# Two things that look like state but are not, and cost a lot of debugging:
-#
-#   - /proc/cmdline is the expansion from the last boot. It is not updated by
-#     fw_setenv, and /proc/mtd only catches up after a reboot.
-#   - `fw_printenv rootmtd` is not authoritative for anything. It reports a
-#     stored value that sf probe overwrites before it is ever used. Read the
-#     image size, or /proc/cmdline after a boot, and ignore the stored variable.
-#
-# `rootsize` is likewise re-derived by sf probe (from ${filesize}). It is used
-# by urwrite for TFTP rootfs writes.
-#
-# The version of this script carried over from OpenIPC checked rootfs against a
-# flat 8MB and did not check the kernel at all. Neither is right here: the chip
-# is 16MB but the rootfs partition is 5 or 8MB of it, so the limit cannot be
-# derived from the flash size. Getting it wrong moves the failure from the
-# build, where it is a number, to the flash, where it is a camera in an unknown
-# state -- flashcp just refuses with "bigger than /dev/mtd3".
+# LX_MEM/mma_heap/cma are the SigmaStar memory carveout, and without them the
+# MI drivers get no contiguous memory and nothing streams. They are written as
+# ${memlx}/${memsz} rather than literals because the bootloader sets those from
+# the RAM size it detects at runtime (infinity6e/chip.c), so one image serves
+# every DRAM population of this SoC.
 
 set -eu
 
 BINARIES_DIR="$1"
 IMAGE_NAME="ssc30kq_${OPENIPC_VARIANT:-image}"
 
-KERNEL_LIMIT=$((2048 * 1024))
-BOOT_LIMIT=$((256 * 1024))
-
-# Mirror cmd_sf.c: the partition U-Boot will hand us depends on the image size.
-rootfs_limit_for() {
-	if [ $(($1 + 0x1000)) -lt $((0x500000)) ]; then
-		echo $((5120 * 1024))
-	else
-		echo $((8192 * 1024))
-	fi
-}
+ALIGN=65536
+FLASH_KB=$((${FLASH_SIZE_MB:-16} * 1024))
+BOOT_KB=256
+ENV_KB=64
 
 rc=0
 
-check() {
+align_up() {
+	echo $((($1 + ALIGN - 1) / ALIGN * ALIGN))
+}
+
+# For partitions whose size is fixed by something outside this build -- the
+# mask ROM's container, the bootloader's compiled CONFIG_ENV_*. Here a
+# percentage is a real measure of remaining headroom, so it is worth a warning.
+check_fixed() {
 	name="$1"
 	path="$2"
 	limit="$3"
@@ -128,11 +86,9 @@ check() {
 		return 1
 	fi
 
-	printf '%s %-16s %8d / %8d bytes (%d%%, %d free)\n' \
+	printf '%s %-24s %8d / %8d bytes (%d%%, %d free)\n' \
 		"$IMAGE_NAME" "$name" "$size" "$limit" "$pct" "$free"
 
-	# The kernel partition has almost no slack on this board. Warn while it is
-	# still only a warning.
 	if [ "$pct" -ge 95 ]; then
 		echo "WARNING: $name is at ${pct}% of its partition -- only $free bytes spare." >&2
 	fi
@@ -140,25 +96,115 @@ check() {
 	return 0
 }
 
-check "uImage" "$BINARIES_DIR/uImage" "$KERNEL_LIMIT" || rc=1
+# For partitions cut to fit the image they hold. These are always ~100% full by
+# construction, so a percentage measures alignment slack and nothing else --
+# reporting one as though it were headroom would be worse than saying nothing.
+# What these images actually compete for is the overlay, checked once below.
+report_sized() {
+	printf '%s %-24s %8d bytes -> %8d partition (%d slack)\n' \
+		"$IMAGE_NAME" "$1" "$2" "$3" "$(($3 - $2))"
+}
+
+KERNEL_BIN="$BINARIES_DIR/uImage"
+ROOTFS_BIN="$BINARIES_DIR/rootfs.squashfs"
+
+for f in "$KERNEL_BIN" "$ROOTFS_BIN"; do
+	if [ ! -f "$f" ]; then
+		echo "ERROR: $IMAGE_NAME expected $(basename "$f") at $f" >&2
+		exit 1
+	fi
+done
+
+KERNEL_PART=$(align_up "$(wc -c <"$KERNEL_BIN")")
+ROOTFS_PART=$(align_up "$(wc -c <"$ROOTFS_BIN")")
+
+KERNEL_KB=$((KERNEL_PART / 1024))
+ROOTFS_KB=$((ROOTFS_PART / 1024))
+DATA_KB=$((FLASH_KB - BOOT_KB - ENV_KB - KERNEL_KB - ROOTFS_KB))
+
+# The bootloader is compiled before the kernel size is known, so its built-in
+# kernaddr/rootaddr are only correct while the kernel partition happens to be
+# 2048KB. The values written below are authoritative and replace them.
+KERN_ADDR=$(((BOOT_KB + ENV_KB) * 1024))
+ROOT_ADDR=$((KERN_ADDR + KERNEL_PART))
+DATA_ADDR=$((ROOT_ADDR + ROOTFS_PART))
+
+if [ "$DATA_KB" -le 0 ]; then
+	echo "ERROR: $IMAGE_NAME kernel ${KERNEL_KB}KB + rootfs ${ROOTFS_KB}KB leave no room for the overlay in ${FLASH_KB}KB of flash." >&2
+	exit 1
+fi
+
+report_sized "uImage" "$(wc -c <"$KERNEL_BIN")" "$KERNEL_PART"
+report_sized "rootfs.squashfs" "$(wc -c <"$ROOTFS_BIN")" "$ROOTFS_PART"
 
 # Built only when sigmastar-uboot is selected, and building it is not flashing
 # it -- the board boots whatever is already in mtd0. Checked because it has the
 # least headroom of the three artifacts and its overflow is the one discovered
-# latest: nothing reads it until someone writes the single partition that cannot
-# be recovered in software.
+# latest: nothing reads it until someone writes the single partition that
+# cannot be recovered in software.
 for boot_bin in "$BINARIES_DIR"/u-boot-*-nor.bin; do
 	[ -f "$boot_bin" ] || continue
-	check "$(basename "$boot_bin")" "$boot_bin" "$BOOT_LIMIT" || rc=1
+	check_fixed "$(basename "$boot_bin")" "$boot_bin" $((BOOT_KB * 1024)) || rc=1
 done
 
-ROOTFS_BIN="$BINARIES_DIR/rootfs.squashfs"
-if [ -f "$ROOTFS_BIN" ]; then
-	ROOTFS_LIMIT=$(rootfs_limit_for "$(wc -c <"$ROOTFS_BIN")")
-	echo "$IMAGE_NAME rootfs partition will be $((ROOTFS_LIMIT / 1024))KB (sf probe sizes it from the image)"
+MTDPARTS="NOR_FLASH:${BOOT_KB}k(boot),${ENV_KB}k(env),${KERNEL_KB}k(kernel),${ROOTFS_KB}k(rootfs),${DATA_KB}k(data),${FLASH_KB}k@0(all)"
+
+BOOTARGS="console=ttyS0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init"
+BOOTARGS="$BOOTARGS mtdparts=$MTDPARTS"
+BOOTARGS="$BOOTARGS LX_MEM=\${memlx} mma_heap=mma_heap_name0,miu=0,sz=\${memsz} cma=2M"
+
+UENV_TXT="$BINARIES_DIR/uenv.txt"
+
+# ethaddr and sensor are deliberately absent. They are per-unit values the OEM
+# wrote once, S03mac reads ethaddr rather than inventing a MAC, and writing
+# this environment over the old one destroys both. Read them off the running
+# camera and put them back after flashing mtd1 -- see the camera README.
+{
+	echo "baseaddr=0x21000000"
+	echo "kernaddr=$(printf '0x%x' "$KERN_ADDR")"
+	echo "kernsize=$(printf '0x%x' "$KERNEL_PART")"
+	echo "rootaddr=$(printf '0x%x' "$ROOT_ADDR")"
+	echo "rootsize=$(printf '0x%x' "$ROOTFS_PART")"
+	echo "dataaddr=$(printf '0x%x' "$DATA_ADDR")"
+	echo "datasize=$(printf '0x%x' $((DATA_KB * 1024)))"
+	echo "mtdparts=$MTDPARTS"
+	echo "bootargs=$BOOTARGS"
+	echo "bootcmd=sf probe 0; setenv setargs setenv bootargs \${bootargs}; run setargs; sf read \${baseaddr} \${kernaddr} \${kernsize}; bootm \${baseaddr}"
+} >"$UENV_TXT"
+
+# mkenvimage pads to the partition size and prepends the CRC the bootloader
+# checks. A plain text file written to mtd1 would be rejected as corrupt and
+# silently replaced by the compiled-in defaults, which still carry the OEM
+# table -- a failure that looks like the new table never having been written.
+MKENVIMAGE="${HOST_DIR:-}/bin/mkenvimage"
+if [ -x "$MKENVIMAGE" ]; then
+	"$MKENVIMAGE" -s $((ENV_KB * 1024)) -o "$BINARIES_DIR/u-boot-env.bin" "$UENV_TXT"
+	# mkenvimage pads to exactly -s, so this is an assertion that the tool did
+	# what was asked, not a headroom measurement. A short image would be read
+	# as a bad CRC and fall back to the compiled-in OEM table.
+	env_size=$(wc -c <"$BINARIES_DIR/u-boot-env.bin")
+	if [ "$env_size" -ne $((ENV_KB * 1024)) ]; then
+		echo "ERROR: $IMAGE_NAME u-boot-env.bin is $env_size bytes, expected $((ENV_KB * 1024))." >&2
+		rc=1
+	else
+		printf '%s %-24s %8d bytes (%d vars)\n' \
+			"$IMAGE_NAME" "u-boot-env.bin" "$env_size" "$(wc -l <"$UENV_TXT")"
+	fi
 else
-	ROOTFS_LIMIT=$((5120 * 1024))
+	echo "ERROR: $IMAGE_NAME mkenvimage not found at $MKENVIMAGE -- cannot build u-boot-env.bin." >&2
+	echo "       Enable BR2_PACKAGE_HOST_UBOOT_TOOLS_ENVIMAGE in the camera defconfig." >&2
+	rc=1
 fi
-check "rootfs.squashfs" "$ROOTFS_BIN" "$ROOTFS_LIMIT" || rc=1
+
+printf '%s %-24s %s\n' "$IMAGE_NAME" "partitions" "$MTDPARTS"
+printf '%s %-24s %dKB (%d%% of flash)\n' \
+	"$IMAGE_NAME" "overlay (data)" "$DATA_KB" "$((DATA_KB * 100 / FLASH_KB))"
+
+# The overlay is what the kernel and rootfs grow into, so it is the one number
+# here that measures anything scarce. sysupgrade stages in /tmp rather than the
+# overlay, so this budget is for /etc and user data, not for updates.
+if [ "$DATA_KB" -lt 1024 ]; then
+	echo "WARNING: overlay is down to ${DATA_KB}KB -- kernel and rootfs growth comes out of it." >&2
+fi
 
 exit $rc
