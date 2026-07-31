@@ -146,9 +146,11 @@ report_sized "rootfs.squashfs" "$(wc -c <"$ROOTFS_BIN")" "$ROOTFS_PART"
 # least headroom of the three artifacts and its overflow is the one discovered
 # latest: nothing reads it until someone writes the single partition that
 # cannot be recovered in software.
+BOOT_BIN=
 for boot_bin in "$BINARIES_DIR"/u-boot-*-nor.bin; do
 	[ -f "$boot_bin" ] || continue
 	check_fixed "$(basename "$boot_bin")" "$boot_bin" $((BOOT_KB * 1024)) || rc=1
+	BOOT_BIN="$boot_bin"
 done
 
 MTDPARTS="NOR_FLASH:${BOOT_KB}k(boot),${ENV_KB}k(env),${KERNEL_KB}k(kernel),${ROOTFS_KB}k(rootfs),${DATA_KB}k(data),${FLASH_KB}k@0(all)"
@@ -196,8 +198,52 @@ if [ -x "$MKENVIMAGE" ]; then
 	fi
 else
 	echo "ERROR: $IMAGE_NAME mkenvimage not found at $MKENVIMAGE -- cannot build u-boot-env.bin." >&2
-	echo "       Enable BR2_PACKAGE_HOST_UBOOT_TOOLS_ENVIMAGE in the camera defconfig." >&2
+	echo "       It comes from host-uboot-tools, a dependency of sigmastar-uboot." >&2
 	rc=1
+fi
+
+# The full firmware image, which is what thingino-sysupgrade actually consumes.
+# It is this flash laid out exactly as the table above describes it, so writing
+# it to the "all" partition reproduces this build byte for byte -- bootloader
+# included. That is the whole reason a full sysupgrade is only meaningful once
+# the bootloader inside it is one we build.
+#
+# It stops at the end of the rootfs rather than padding out to the full 16MB.
+# sysupgrade erases the partition before writing, so the overlay area is
+# already 0xFF and /init formats it on first boot; carrying 8MB of padding
+# would only make every download bigger.
+#
+# The image is identified by its first bytes, and a SigmaStar boot container
+# does not begin with a magic number -- see image_starts_with_bootloader in
+# thingino-sysupgrade, which is what teaches sysupgrade to recognise this.
+if [ -n "$BOOT_BIN" ] && [ -f "$BINARIES_DIR/u-boot-env.bin" ]; then
+	FIRMWARE_BIN="$BINARIES_DIR/thingino-${CAMERA:-ssc30kq}.bin"
+
+	dd if=/dev/zero bs=$ALIGN count=$((DATA_ADDR / ALIGN)) status=none |
+		tr '\000' '\377' >"$FIRMWARE_BIN"
+
+	# Every offset here is 64KB-aligned by construction, so each piece lands on
+	# a whole block and dd never has to read-modify-write.
+	dd if="$BOOT_BIN" of="$FIRMWARE_BIN" bs=$ALIGN seek=0 \
+		conv=notrunc status=none
+	dd if="$BINARIES_DIR/u-boot-env.bin" of="$FIRMWARE_BIN" bs=$ALIGN \
+		seek=$((BOOT_KB * 1024 / ALIGN)) conv=notrunc status=none
+	dd if="$KERNEL_BIN" of="$FIRMWARE_BIN" bs=$ALIGN \
+		seek=$((KERN_ADDR / ALIGN)) conv=notrunc status=none
+	dd if="$ROOTFS_BIN" of="$FIRMWARE_BIN" bs=$ALIGN \
+		seek=$((ROOT_ADDR / ALIGN)) conv=notrunc status=none
+
+	fw_size=$(wc -c <"$FIRMWARE_BIN")
+	if [ "$fw_size" -ne "$DATA_ADDR" ]; then
+		echo "ERROR: $IMAGE_NAME $(basename "$FIRMWARE_BIN") is $fw_size bytes, expected $DATA_ADDR." >&2
+		rc=1
+	elif [ "$(dd if="$FIRMWARE_BIN" bs=1 skip=4 count=4 status=none | od -An -tx1 | tr -d ' \n')" != "49504c5f" ]; then
+		echo "ERROR: $IMAGE_NAME $(basename "$FIRMWARE_BIN") has no IPL_ signature at offset 4 -- sysupgrade would reject it." >&2
+		rc=1
+	else
+		printf '%s %-24s %8d bytes (boot+env+kernel+rootfs, overlay left erased)\n' \
+			"$IMAGE_NAME" "$(basename "$FIRMWARE_BIN")" "$fw_size"
+	fi
 fi
 
 printf '%s %-24s %s\n' "$IMAGE_NAME" "partitions" "$MTDPARTS"

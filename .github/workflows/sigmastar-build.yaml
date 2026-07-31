@@ -137,5 +137,6 @@ jobs:
             output/*/${{ env.CAMERA }}-*/images/u-boot-*-nor.bin
             output/*/${{ env.CAMERA }}-*/images/u-boot-env.bin
             output/*/${{ env.CAMERA }}-*/images/uenv.txt
+            output/*/${{ env.CAMERA }}-*/images/thingino-*.bin
           if-no-files-found: error
           retention-days: 14

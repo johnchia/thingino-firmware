@@ -1,18 +1,26 @@
 # SSC30KQ — bootloader and partition bring-up
 
-The build produces four flashable artifacts. Only one of them can brick the
-board, and it is flashed last, separately, after everything else has been shown
-to work.
+`thingino-<camera>.bin` is the deliverable: the whole flash laid out as the
+table below describes it, which `sysupgrade` writes to the `all` partition. It
+contains the bootloader, so a full sysupgrade replaces mtd0 — the one write on
+this board that cannot be undone in software.
 
-| artifact | goes to | recoverable in software? |
-|---|---|---|
-| `rootfs.squashfs` | mtd3 `rootfs` | yes |
-| `uImage` | mtd2 `kernel` | yes |
-| `u-boot-env.bin` | mtd1 `env` | yes — a working bootloader can rewrite it |
-| `u-boot-ssc30kq-nor.bin` | mtd0 `boot` | **no** |
+The individual pieces are also emitted, and are what you use when you want to
+change one thing rather than everything:
 
-`uenv.txt` beside them is the same environment in text form. It is what to read
-when you want to know what the build decided, and the input to `fw_setenv`.
+| artifact | offset in the full image | goes to | recoverable? |
+|---|---|---|---|
+| `u-boot-ssc30kq-nor.bin` | 0x000000 | mtd0 `boot` | **no** |
+| `u-boot-env.bin` | 0x040000 | mtd1 `env` | yes |
+| `uImage` | 0x050000 | mtd2 `kernel` | yes |
+| `rootfs.squashfs` | 0x250000 | mtd3 `rootfs` | yes |
+
+`uenv.txt` is the same environment in text form — what to read when you want to
+know what the build decided, and the input to `fw_setenv`.
+
+The full image stops at the end of the rootfs instead of padding to 16MB.
+sysupgrade erases before writing, so the overlay area is already erased and
+`/init` formats it on first boot.
 
 ## The table
 
@@ -89,28 +97,36 @@ fw_printenv mtdparts bootargs bootcmd     # read it back before rebooting
 reboot
 ```
 
-After the reboot `/proc/mtd` shows the new table and the old rootfs still boots
-— it is at the same offset, only the partition around it grew. Then flash the
-matching images:
+Then erase the overlay, which has moved and whose old contents no longer parse:
 
 ```sh
-flashcp -v uImage          /dev/mtd2
-flashcp -v rootfs.squashfs /dev/mtd3
-flash_eraseall -j          /dev/mtd4
+flash_eraseall -j /dev/mtd4
 reboot
 ```
 
-Stage 1 is done when the camera boots, streams, and `/proc/mtd` lists `data` and
-`all`. `sysupgrade` should now pass `check_upgrade_partitions`.
+**The kernel and rootfs do not need reflashing.** `boot`, `env`, `kernel` and
+`rootfs` sit at identical offsets in the OEM table and the generated one — only
+the rootfs partition's declared size changes, and only the overlay actually
+moves. The bytes already in flash are already where the new table says they are,
+so copying them onto themselves proves nothing.
 
-## Stage 2 — the bootloader (not recoverable in software)
+Stage 1 is done when the camera boots, streams, and `/proc/mtd` lists `data` and
+`all`. `sysupgrade` now passes `check_upgrade_partitions`, which is the point:
+it is the first moment the update path can be exercised at all.
+
+## Stage 2 — the full image, which replaces the bootloader
 
 Only after stage 1 is good, and only with the serial console attached and an SPI
 flash clip within reach:
 
 ```sh
-flashcp -v u-boot-ssc30kq-nor.bin /dev/mtd0
+sysupgrade thingino-<camera>.bin
 ```
+
+This is the phase's actual deliverable, and it writes mtd0 along with everything
+else — sysupgrade says so before it starts. `flashcp -v u-boot-ssc30kq-nor.bin
+/dev/mtd0` does the bootloader alone if you want the write isolated, but there
+is no version of this step that leaves mtd0 untouched.
 
 `u-boot-ssc30kq-nor.bin` is the mask-ROM container — IPL, MXP_SF and IPL_CUST at
 fixed offsets in the first 128KB with the compressed U-Boot appended. It is not
@@ -119,6 +135,19 @@ cannot be recovered over the network.
 
 Do not write mtd0 to fix a problem in stage 1. Nothing stage 1 can go wrong with
 is caused by the bootloader.
+
+### Why sysupgrade needed a patch to accept this image
+
+sysupgrade identifies a full image by its first four bytes being Ingenic's
+`06050403`. A SigmaStar boot container has no magic number there at all — it
+opens with an ARM branch whose encoding moves with the branch offset
+(`060000ea` here, `020000ea` in the vendor's own IPL blobs). Its stable
+signature is `IPL_` at offset 4.
+
+Without that check, sysupgrade rejects a perfectly good image as `Unknown file`,
+and `-b` fails the same way in `extract_bootloader`. `image_starts_with_bootloader`
+in `package/thingino-sysupgrade/files/sysupgrade` checks both, and is worth
+offering upstream — it is not specific to this board, only to not being Ingenic.
 
 ## If the environment is lost
 
