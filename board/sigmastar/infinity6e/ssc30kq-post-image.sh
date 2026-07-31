@@ -162,9 +162,14 @@ BOOTARGS="$BOOTARGS LX_MEM=\${memlx} mma_heap=mma_heap_name0,miu=0,sz=\${memsz} 
 UENV_TXT="$BINARIES_DIR/uenv.txt"
 
 # ethaddr and sensor are deliberately absent. They are per-unit values the OEM
-# wrote once, S03mac reads ethaddr rather than inventing a MAC, and writing
-# this environment over the old one destroys both. Read them off the running
-# camera and put them back after flashing mtd1 -- see the camera README.
+# wrote once, and writing this environment over the old one destroys both. Read
+# them off the running camera and put them back after flashing mtd1 -- see the
+# camera README.
+#
+# Neither is load-bearing at boot: S03mac derives the MAC from the SoC die ID
+# without consulting ethaddr, and load_sigmastar re-probes i2c whenever sensor
+# is empty. ethaddr is worth keeping anyway, because the environment is its only
+# record and an erase is the moment it stops existing anywhere.
 {
 	echo "baseaddr=0x21000000"
 	echo "kernaddr=$(printf '0x%x' "$KERN_ADDR")"

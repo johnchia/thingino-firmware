@@ -112,21 +112,28 @@ Save the MAC:
 fw_printenv ethaddr
 ```
 
-Losing it is no longer fatal — `S03mac` falls back to a MAC derived from the
-SoC's OTP die ID, which is burned at the fab and not in flash, so a camera that
-comes back from an upgrade with an erased environment still gets a stable
-address rather than a new random one each boot. But the derived address is a
-synthetic locally-administered `02:` one, not the board's assigned MAC, so
-anything holding a DHCP reservation against the real one still wants it back.
+Losing it costs nothing at boot. `S03mac` does not read `ethaddr` at all — it
+derives the MAC from the SoC's OTP die ID, which is burned at the fab rather
+than stored in flash, so the address is the same before and after any erase.
+Save it because the environment is the *only* record of the assigned address,
+and this is the last moment it exists: nothing on the camera will reproduce it
+once mtd1 is overwritten.
+
+If you want it back later, the web UI's network page accepts a MAC and writes
+`eth.mac`, which takes precedence over the derived one. That is the intended
+route for a unit under a DHCP reservation made against the assigned address —
+and it has to be re-entered after any full upgrade, since the overlay holding
+`eth.mac` is erased along with everything else.
 
 `sensor` needs no saving at all. `load_sigmastar` probes i2c through `ipcinfo`
 whenever the variable is empty and writes the answer back, so it repairs itself
 on the next boot.
 
-**Both fallbacks change the hostname.** `S04hostname` builds the name from the
-last four hex digits of `soc -s`, falling back to the MAC, so this unit is
-`ing-noname-ssc30kq-FA37` from the die ID rather than the `-CD96` its assigned
-MAC gave. Worth knowing before an update rather than after.
+**The hostname comes from the same place and does not track the MAC.**
+`S04hostname` builds the name from the last four hex digits of `soc -s`, falling
+back to the MAC only if that fails, so this unit is `ing-noname-ssc30kq-FA37`
+from the die ID rather than the `-CD96` its assigned MAC would have given.
+Setting `eth.mac` in the web UI does not rename it back.
 
 **The overlay is about to be erased.** `data` moves when the rootfs partition is
 resized, so its jffs2 contents no longer parse and `/init` reformats them.
@@ -321,13 +328,22 @@ no restore counterpart, so untarring it afterwards is by hand. (`restore.cgi` is
 unrelated — it copies a single file back from `/rom` to undo an overlay edit.)
 
 This is not a SigmaStar limitation and needs no fix here. It is only worth
-stating because it is what makes a stateless MAC necessary rather than merely
-tidy: an Ingenic camera survives the erase looking identical to a fresh one,
-since everything genuinely per-unit is re-derived from silicon on each boot. On
-this board `ethaddr` lived in the environment and nowhere else, so without the
-die-ID fallback in `S03mac` a routine upgrade would have changed the camera's
-identity on the network. `sensor` needs no equivalent — `load_sigmastar`
-re-probes i2c whenever the variable is empty and writes it back.
+stating because it is what decides where the MAC comes from. An Ingenic camera
+survives the erase looking identical to a fresh one, since everything genuinely
+per-unit is re-derived from silicon on each boot. This board could have
+preferred the assigned `ethaddr`, but that address lives in the environment and
+nowhere else, so a camera that preferred it would run one MAC until its first
+update and a derived one forever after — changing identity on the network at the
+worst possible moment, under whatever DHCP reservation was made against the old
+value. `S03mac` therefore derives from the die ID unconditionally and never
+reads `ethaddr`: one address, the same before and after every update.
+
+The cost is that the assigned MAC is not used even when it is present, and a
+site that needs it must re-enter it on the network page after each full upgrade.
+That is a deliberate trade — a 48-bit fab-burned die ID makes collisions
+vanishingly unlikely, and the derived address is locally-administered, so it
+never claims to be globally unique. `sensor` needs no equivalent treatment;
+`load_sigmastar` re-probes i2c whenever the variable is empty and writes it back.
 
 ### If the environment is lost
 
