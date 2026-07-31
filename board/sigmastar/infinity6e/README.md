@@ -38,7 +38,7 @@ cannot be recovered over the network.
 
 ## The partition table
 
-Generated per build by `ssc30kq-post-image.sh`, sized to the images:
+Generated per build by `board/sigmastar/post-image.sh`, sized to the images:
 
 ```
 NOR_FLASH:256k(boot),64k(env),<kernel>k(kernel),<rootfs>k(rootfs),<data>k(data),16384k@0(all)

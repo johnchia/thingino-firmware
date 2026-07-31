@@ -1,19 +1,26 @@
 #!/bin/sh
 #
-# Size the SSC30KQ's flash partitions to the built images and emit the U-Boot
-# environment that describes them.
+# Size a SigmaStar board's flash partitions to the built images and emit the
+# U-Boot environment that describes them.
+#
+# Shared by every SigmaStar family rather than copied per board. Nothing in
+# here is family-specific: the flash size comes from the camera defconfig's
+# FLASH_SIZE_MB, the two fixed partitions are properties of the bootloader
+# this tree builds, and the rest is arithmetic on the images just produced.
 #
 # The partition table is a property of the environment, not of the board. The
 # kernel takes it from the cmdline (CONFIG_MTD_CMDLINE_PARTS=y,
-# CONFIG_MTD_OF_PARTS unset), U-Boot builds the cmdline from ${bootargs}, and
-# this script writes ${bootargs}. Nothing reads a device tree for it.
+# CONFIG_MTD_OF_PARTS unset -- checked on both Infinity6E and Infinity6B0),
+# U-Boot builds the cmdline from ${bootargs}, and this script writes
+# ${bootargs}. Nothing reads a device tree for it, despite these kernels
+# carrying a CONFIG_SS_DTB_NAME.
 #
 #   mtd0  "boot"     256KB   fixed -- mask-ROM container, see sigmastar-uboot.mk
 #   mtd1  "env"       64KB   fixed -- must match the bootloader's CONFIG_ENV_*
 #   mtd2  "kernel"           sized to uImage, 64KB-aligned
 #   mtd3  "rootfs"           sized to rootfs.squashfs, 64KB-aligned
 #   mtd4  "data"             the remainder; jffs2 overlay upperdir
-#   mtd5  "all"       16MB   whole chip at offset 0, overlapping the rest
+#   mtd5  "all"              whole chip at offset 0, overlapping the rest
 #
 # The two fixed sizes are not free choices. The bootloader is compiled with
 # CONFIG_ENV_OFFSET 0x40000 and CONFIG_ENV_SIZE 0x10000, so "boot" must be
@@ -55,7 +62,7 @@
 set -eu
 
 BINARIES_DIR="$1"
-IMAGE_NAME="ssc30kq_${OPENIPC_VARIANT:-image}"
+IMAGE_NAME="${SOC_MODEL:-sigmastar}_image"
 
 ALIGN=65536
 FLASH_KB=$((${FLASH_SIZE_MB:-16} * 1024))
@@ -213,10 +220,15 @@ fi
 # included. That is the whole reason a full sysupgrade is only meaningful once
 # the bootloader inside it is one we build.
 #
-# It stops at the end of the rootfs rather than padding out to the full 16MB.
+# It stops at the end of the rootfs rather than padding out to the full chip.
 # sysupgrade erases the partition before writing, so the overlay area is
-# already 0xFF and /init formats it on first boot; carrying 8MB of padding
-# would only make every download bigger.
+# already 0xFF and /init formats it on first boot; carrying megabytes of
+# padding would only make every download bigger.
+#
+# That truncation is also why this image is safe to write with an external
+# programmer: everything it contains is a partition whose content this build
+# owns, and the bytes it stops short of are exactly the ones that would be
+# erased anyway.
 #
 # The image is identified by its first bytes, and a SigmaStar boot container
 # does not begin with a magic number -- see image_starts_with_bootloader in
