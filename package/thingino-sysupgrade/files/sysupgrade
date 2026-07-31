@@ -20,7 +20,20 @@ stage2app="sysupgrade-stage2"
 SD_CARD_ROOT="/mnt/mmcblk0p1"
 
 self=$(realpath $0)
-selfupdate="true"
+# Off in this tree, where upstream has it on.
+#
+# update_self() fetches sysupgrade and sysupgrade-stage2 from themactep's
+# `stable` branch and execs what it downloaded. Any local change to this script
+# is therefore reverted moments before it would have been used -- which is how
+# the SigmaStar image check below came to be replaced by the Ingenic-only one
+# and a valid image was rejected as "Unknown file".
+#
+# It is not only transient. The stage 2 download lands in /sbin, not the work
+# directory, so upstream's copy persists in the overlay after the run.
+#
+# A tree that patches this script cannot also let it replace itself from a
+# branch that does not carry the patch. -x still exists and is now redundant.
+selfupdate="false"
 bbapplets="date echo flash_eraseall flashcp killall pidof reboot rm sh sleep sync tail"
 upgrade=""
 gestalt_app="/sbin/gestalt"

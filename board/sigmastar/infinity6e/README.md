@@ -217,6 +217,28 @@ sysupgrade /tmp/thingino-<camera>.bin
 sysupgrade prints its own warning and gives you ten seconds to cancel, then
 erases the `all` partition and writes the image over it, bootloader included.
 
+**A failed run consumes the image.** The file is *moved* to
+`/tmp/sysupgrade/fw.bin`, not copied, and `cleanup` removes that directory on
+any error — so the copy you uploaded is gone and has to be sent again before
+retrying. Keep it somewhere else on the camera if you expect more than one
+attempt.
+
+**If it says `Unknown file`, the script that rejected it was not this one.**
+Upstream's `update_self` downloads sysupgrade and sysupgrade-stage2 from
+themactep's `stable` branch and execs what it fetched, discarding the SigmaStar
+image check along with every other local change. This tree defaults
+`selfupdate="false"` to prevent that. On a camera running an older image, force
+it per-run:
+
+```sh
+sysupgrade -x /tmp/thingino-<camera>.bin
+```
+
+The stage 2 download also lands in `/sbin/sysupgrade-stage2` rather than the
+work directory, so upstream's copy persists in the overlay afterwards. It is
+harmless — the patch is entirely in stage 1 — but it is why the file can differ
+from the built image on a camera that has run an upgrade.
+
 What stage 2 actually proves is the update path, not the image: that a full
 `.bin` is recognised, staged, and flashed end to end. If it fails, the recovery
 is the same clip and the same full dump.
