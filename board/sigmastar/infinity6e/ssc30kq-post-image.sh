@@ -25,10 +25,14 @@
 # which is to say a full sysupgrade rewrites the bootloader, and is only
 # meaningful because the bootloader in that image is one we build.
 #
-# ("upgrade", which sysupgrade also looks for, is deliberately absent. It is
-# declared in no mtdparts anywhere in this tree, upstream included, so the
-# partial-upgrade-from-GitHub path dies on every thingino board equally. It is
-# not something this port is missing.)
+# ("upgrade", which sysupgrade also looks for, is deliberately absent. It is a
+# real partition, but a historical one: the compiled default table in the
+# 2013.07 U-Boot carries 15872k@0x80000(upgrade) -- everything past the
+# bootloader, env and config -- which is what let a partial image be flashed
+# without touching mtd0. The modern generated table dropped it, and sysupgrade
+# disabled partial upgrades outright in cd645cae6, so `-p` now exits 1 before
+# any partition is looked up. Adding one here would resurrect a path no board
+# takes.)
 #
 # "data" replaces the OEM's "rootfs_data". The name matters: /init matches the
 # overlay partition with a loose /data/ in mount_jffs2 but a strict /"data"/ in
