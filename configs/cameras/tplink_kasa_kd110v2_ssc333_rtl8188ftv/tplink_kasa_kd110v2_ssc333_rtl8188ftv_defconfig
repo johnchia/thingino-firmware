@@ -1,21 +1,32 @@
-# NAME: Unbranded SSC333 (Infinity6B0, USB Wi-Fi)
+# NAME: TP-Link Kasa KD110 v2 (SSC333, Infinity6B0, USB Wi-Fi)
 #
-# The second SigmaStar board in this tree, and the first that is not a camera.
-# Its purpose is to prove the SigmaStar layer generalizes past the family it
-# was written against: boot, network, SSH, nothing else.
+# The second SigmaStar board in this tree. Its purpose is to prove the
+# SigmaStar layer generalizes past the family it was written against: boot,
+# network, SSH, nothing else.
 #
-# Named per thingino's <brand>_[model_]<soc>_<sensor>[_<wifi>] convention with
-# the sensor field omitted, because this target drives no sensor. The wifi
-# field carries rtl8188ftv, which is the marking on the modules that ship with
-# these boards; the driver package is wifi-rtl8188fu (FU is the USB interface,
-# FTV the part) and thingino uses both spellings the same way -- cf.
+# Named per thingino's <brand>_[model_]<soc>_<sensor>[_<wifi>] convention,
+# following the tplink_tapo_* targets in putting the sub-brand in the model
+# field -- kasa_kd110v2 as tapo_c500. That yields hostname ing-tplink-kasa,
+# built from the first two underscore fields by scripts/rootfs_script.sh, in
+# the same way tplink_tapo_* yields ing-tplink-tapo.
+#
+# The sensor field is omitted. THE HARDWARE HAS A SENSOR -- this is a camera --
+# but this target drives no streamer and installs no sensor configuration, so
+# naming one would state a fact nothing in the build reads. Fill it in if and
+# when a streamer arrives.
+#
+# The wifi field carries rtl8188ftv, the marking on the module fitted to this
+# board; the driver package is wifi-rtl8188fu (FU is the USB interface, FTV the
+# part) and thingino uses both spellings the same way -- cf.
 # wanjiaan_hdc51_t31l_sc2332_rtl8188ftv.
 #
-# WHAT IS DELIBERATELY NOT HERE: no streamer, no sensor configs, no vendor MI
-# bundle. sigmastar-osdrv-infinity6b0 is not selected and is not packaged in
-# this tree -- with no streamer nothing dlopens the MI libraries, and the
-# kernel modules that back them are 5.1MB of a 8MB part. A board that needs to
-# stream needs that package added; a board that needs to boot does not.
+# Verified on hardware: boots to a serial login, Wi-Fi comes up without any
+# GPIO poking, and the captive portal is reachable.
+#
+# WHAT IS DELIBERATELY NOT HERE: no streamer. The vendor MI bundle IS installed
+# (see BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6B0 below) because sensor bring-up
+# needs it, but nothing dlopens those libraries at runtime yet -- no rvd, no
+# ONVIF, no audio. Adding a streamer is the next decision, not an oversight.
 # FRAG: soc-sigmastar core-sigmastar ssl-mbedtls
 
 # board.mk includes this file as a makefile before thingino.mk runs, so these
@@ -103,10 +114,59 @@ BR2_PACKAGE_WIFI_RTL8188FU=y
 
 BR2_PACKAGE_DROPBEAR=y
 
-# ipcinfo. Nothing at boot needs it on a board with no sensor, but this is the
-# first Infinity6B0 in the tree and it is the cheapest way to ask the running
-# chip what it is.
+# SLOW FIRST BOOT, UNRESOLVED. Recorded here because it looks like a hang.
+#
+# This kernel has no usable hardware RNG. The vendor tree carries one
+# (drivers/sstar/crypto/char/hw_random/sstar-rng.c, gated on CONFIG_SS_RNG) but
+# it is a platform driver bound by the device-tree compatible "sstar,rng", and
+# that string appears nowhere except in the driver itself -- no device tree in
+# this kernel declares the node, so enabling it would add a driver that never
+# probes.
+#
+# So the only entropy at boot is interrupt timing, and this board has almost
+# none: no ethernet, no disk, and wlan0 does not exist yet. Meanwhile S02ssl
+# runs at position 02 and generates the uhttpd certificate through mbedTLS,
+# whose entropy poll uses a blocking getrandom(). Init waits at S02 for a CRNG
+# that only the later stages of the same init sequence could seed.
+#
+# It resolves on its own, and S01seedrng persists a seed so later boots are
+# fast -- but a fresh flash is a first boot every time. Typing on the serial
+# console feeds the pool from keypress timing and gets past it immediately.
+#
+# Left alone deliberately. Every fix considered so far costs more than the
+# symptom: an entropy daemon is a new package and an init-order change, and a
+# device-tree node needs an RNG register base nobody has verified on this part.
+
+# ipcinfo, and the i2c sensor probe behind it.
 BR2_PACKAGE_IPCTOOL=y
+
+# The vendor MI bundle: mi_* kernel modules, MI userspace libraries, ISP
+# firmware and the per-sensor tuning blobs. S20sigmastar (shipped by the
+# package) inserts the modules; without them mi_sensor does not exist and the
+# i2c probe has nothing to talk to.
+#
+# There is no streamer on this board, so nothing consumes the MI libraries at
+# runtime yet. They are here for sensor bring-up: identifying what is actually
+# fitted, which is the prerequisite for deciding whether streaming is worth
+# pursuing on an 8MB part.
+BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6B0=y
+
+# ONE SENSOR, AND THIS MAKES THE IMAGE BOARD-SPECIFIC RATHER THAN SoC-SPECIFIC.
+#
+# The Infinity6E target ships all of its sensor blobs and autodetects, which is
+# the right default: load_sigmastar probes i2c and binds whatever it finds, so
+# a blob that is not installed is a board this image cannot drive. That target
+# is on 16MB and the full set costs it nothing worth counting.
+#
+# This part is 8MB and cannot hold the vendor bundle, a kernel and a rootfs at
+# full width. The full set of 15 blobs is ~1.5MB raw. Narrowing to the sensor
+# this board is fitted with is the deliberate trade, and it is stated here
+# rather than hidden in the package so the cost is visible where the decision
+# was made.
+#
+# Widen this the moment the space exists, or if this image is ever pointed at
+# another SSC333 board.
+BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6B0_SENSORS="sc3336"
 
 # The OpenIPC toolchain sysroot ships a libz that -lz resolves against at link
 # time, but Buildroot's toolchain-external only copies a fixed set of runtime
