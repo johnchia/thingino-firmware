@@ -1,0 +1,117 @@
+# NAME: Unbranded SSC333 (Infinity6B0, USB Wi-Fi)
+#
+# The second SigmaStar board in this tree, and the first that is not a camera.
+# Its purpose is to prove the SigmaStar layer generalizes past the family it
+# was written against: boot, network, SSH, nothing else.
+#
+# Named per thingino's <brand>_[model_]<soc>_<sensor>[_<wifi>] convention with
+# the sensor field omitted, because this target drives no sensor. The wifi
+# field carries rtl8188ftv, which is the marking on the modules that ship with
+# these boards; the driver package is wifi-rtl8188fu (FU is the USB interface,
+# FTV the part) and thingino uses both spellings the same way -- cf.
+# wanjiaan_hdc51_t31l_sc2332_rtl8188ftv.
+#
+# WHAT IS DELIBERATELY NOT HERE: no streamer, no sensor configs, no vendor MI
+# bundle. sigmastar-osdrv-infinity6b0 is not selected and is not packaged in
+# this tree -- with no streamer nothing dlopens the MI libraries, and the
+# kernel modules that back them are 5.1MB of a 8MB part. A board that needs to
+# stream needs that package added; a board that needs to boot does not.
+# FRAG: soc-sigmastar core-sigmastar ssl-mbedtls
+
+# board.mk includes this file as a makefile before thingino.mk runs, so these
+# two are read as plain make variables there and drive SOC_VENDOR/FAMILY/ARCH.
+# They are not Kconfig symbols; olddefconfig drops them from .config.
+#
+# SOC_FAMILY is the load-bearing one. It alone selects the kernel tarball
+# (openipc/linux archive/sigmastar-infinity6b0), the kernel config
+# (board/sigmastar/infinity6b0/linux.config), and the U-Boot defconfig and IPL
+# blob directory (infinity6b0_defconfig, ipl/infinity6b0/). All three are keyed
+# on it in shared files, so this target adds no vendor plumbing of its own.
+#
+# SSC333 is Infinity6B0, NOT Infinity6E. The two are close -- same Cortex-A7,
+# same 4.9 kernel line, same EMAC, EHCI and GPIO drivers, kernel configs that
+# differ in 152 lines -- but they are separate families with separate kernel
+# trees and separate toolchains, and treating one as the other silently builds
+# against the wrong vendor headers.
+BR2_SIGMASTAR_SOC_MODEL="ssc333"
+BR2_SIGMASTAR_SOC_FAMILY="infinity6b0"
+
+# 8MB NOR, confirmed on the target board. OpenIPC ships ssc333 defconfigs for
+# both 8 and 16MB, so this is a per-unit fact rather than a property of the
+# SoC; board/sigmastar/post-image.sh sizes every partition from it.
+FLASH_SIZE_MB=8
+
+# THE TOOLCHAIN IS PER-FAMILY, AND THIS FAMILY IS MUSL.
+#
+# OpenIPC publishes one toolchain per SoC family and they do not share a libc:
+# toolchain.sigmastar-infinity6e is glibc (arm-openipc-linux-gnueabihf), and
+# toolchain.sigmastar-infinity6b0 is musl (arm-openipc-linux-musleabihf). Both
+# ssc333 defconfigs upstream use the musl one, so that is the combination with
+# field mileage on this silicon.
+#
+# core-sigmastar.fragment declares GLIBC for the Infinity6E board. Overriding
+# it here works because scripts/resolve_toolchain_value.sh walks the fragment
+# stack and the camera defconfig in order and takes the LAST match, and
+# Makefile:172 puts this file after the fragments. That resolution happens
+# before Buildroot runs, so it picks the toolchain fragment file too.
+#
+# If musl turns out to fight the application layer -- this is the first time
+# thingino's userspace is built for ARM against musl -- the fallback is the
+# Infinity6E glibc toolchain, which is the same GCC for the same architecture
+# and cares nothing for the SoC family in its name. That is a fallback and not
+# the default, because it would be a combination nobody has shipped.
+BR2_THINGINO_TOOLCHAIN_LIBC_MUSL=y
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM=y
+BR2_TOOLCHAIN_EXTERNAL_DOWNLOAD=y
+BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/openipc/firmware/releases/download/toolchain/toolchain.sigmastar-infinity6b0.tgz"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX="arm-openipc-linux-musleabihf"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_MUSL=y
+BR2_TOOLCHAIN_EXTERNAL_GCC_13=y
+BR2_TOOLCHAIN_EXTERNAL_CXX=y
+
+# Makefile:580-588 appends 3.10 or 4.4 headers unconditionally from the Ingenic
+# KERNEL_VERSION and runs before this file is appended. The OpenIPC ARM
+# toolchains ship 4.9 headers.
+BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
+
+BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/post-image.sh"
+
+# Not an IP camera, and saying so is what keeps this image small.
+#
+# BR2_THINGINO_DEV_CAMERA is a hidden helper (Config.soc.in:925) set only by
+# DEV_IPCAM or DEV_WEBCAM, and it gates the entire camera stack: streamer,
+# ONVIF, the IMP libraries, the ISP kernel modules, rmem. Choosing SBC leaves
+# it unset, so none of that is selected and none of it has to be guarded.
+#
+# The alternative -- DEV_IPCAM with the streamer set to None -- would describe
+# the board less accurately and drag in the rest of the stack to be turned off
+# one symbol at a time.
+BR2_THINGINO_DEV_SBC=y
+
+# The bootloader. Not optional on this board, unlike the Infinity6E target
+# where it was built for months before it was flashed: the first hardware test
+# here writes the whole chip from an external programmer, so the boot container
+# and the environment in that image are the ones the board will run.
+BR2_PACKAGE_SIGMASTAR_UBOOT=y
+
+# Wi-Fi is the only network interface. BR2_PACKAGE_WIFI is the umbrella --
+# wpa_supplicant with NL80211, wireless-tools, thingino-kopt -- and the FU
+# package is the driver. Its Ingenic USB-controller selects are guarded on
+# !BR2_SOC_SIGMASTAR; see package/wifi-rtl8188fu/Config.in.
+BR2_PACKAGE_WIFI=y
+BR2_PACKAGE_WIFI_RTL8188FU=y
+
+BR2_PACKAGE_DROPBEAR=y
+
+# ipcinfo. Nothing at boot needs it on a board with no sensor, but this is the
+# first Infinity6B0 in the tree and it is the cheapest way to ask the running
+# chip what it is.
+BR2_PACKAGE_IPCTOOL=y
+
+# The OpenIPC toolchain sysroot ships a libz that -lz resolves against at link
+# time, but Buildroot's toolchain-external only copies a fixed set of runtime
+# libraries into the target, so libz.so.1 would be missing at runtime and
+# anything reaching it through libcurl would fail to start. Building a real
+# target zlib gives the library one owner. Same reasoning as the Infinity6E
+# target, where curl and telegrambot both broke on it.
+BR2_PACKAGE_ZLIB=y
