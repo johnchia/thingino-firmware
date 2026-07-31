@@ -1,0 +1,34 @@
+config BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6B0
+	bool "sigmastar-osdrv-infinity6b0"
+	depends on BR2_SOC_SIGMASTAR
+	select BR2_PACKAGE_SIGMASTAR_OSDRV_SENSORS
+	help
+	  SigmaStar Infinity6B0 vendor MI driver bundle: the mi_* kernel
+	  modules, the MI userspace libraries, the ISP firmware, and the
+	  per-sensor ISP tuning blobs.
+
+	  Ported from OpenIPC's package of the same name. The .ko files are
+	  the vendor's, built against Linux 4.9.84, which is why this board
+	  pins that kernel: insmod checks vermagic and a mismatch is fatal.
+
+	  https://github.com/openipc/firmware
+
+config BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6B0_SENSORS
+	string "sensor tuning blobs to install"
+	default ""
+	depends on BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6B0
+	help
+	  Space-separated list of sensor names whose ISP tuning blobs are
+	  installed, without the .bin suffix -- for example "sc3336" or
+	  "sc3336 sc3338". Leave empty to install all of them, which is the
+	  right answer whenever the flash can afford it.
+
+	  Narrowing this makes the image board-specific rather than
+	  SoC-specific: load_sigmastar probes i2c and binds whichever sensor
+	  it finds, so a blob that is not installed is a board the image
+	  cannot drive. Only set it when the part is too small to hold the
+	  full set, and say in the camera defconfig which board it was cut
+	  for.
+
+	  The full set is roughly 1.5MB raw. What that costs compressed
+	  depends on how well the blobs dedupe against each other.
