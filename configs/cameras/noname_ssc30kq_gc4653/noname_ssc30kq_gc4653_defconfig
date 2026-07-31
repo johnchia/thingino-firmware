@@ -16,6 +16,26 @@
 # per silicon combination (cf. the eight tplink_tapo variants). That is a
 # *naming* convention only: this target still installs all six Infinity6E sensor
 # configs and autodetects at runtime, so one image runs on any SSC30KQ board.
+#
+# BR2_SENSOR_1_NAME is deliberately unset, and this is the one camera with a
+# sensor where that is true -- 169 of the other 170 set it, and the exception is
+# an A1 NVR that Config.sensor.in excludes for having no sensor at all. The
+# symbol is not inert-by-accident here: thingino.mk exports SENSOR_1_MODEL and
+# ingenic-sdk is its only consumer, using it to pick which sensor driver and IQ
+# blob to build. This board builds no ingenic-sdk, so setting it would declare a
+# fact nothing reads.
+#
+# The runtime difference is real and worth keeping. On Ingenic the sensor is
+# chosen at build time and /proc/jz/sensor merely reports back what the single
+# shipped driver registered; there is no probe. Here load_sigmastar inserts
+# sensor_config.ko, probes i2c through ipcinfo, binds the matching driver out of
+# all six, and caches the answer in the U-Boot `sensor` variable.
+#
+# That probe is why `sensor` does not have to survive a full sysupgrade. The
+# upgrade erases the whole chip including the environment; the next boot finds
+# the variable empty, re-probes, and writes it back. Declaring the sensor
+# statically would trade a self-healing path for one that needs the environment
+# restored by hand.
 # FRAG: soc-infinity6e core-sigmastar ssl-mbedtls
 
 # board.mk includes this file as a makefile before thingino.mk runs, so these

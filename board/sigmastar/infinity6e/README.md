@@ -66,12 +66,18 @@ scp thingino-<camera>.bin uenv.txt root@<camera>:/tmp/
 
 ## Before you touch anything
 
-Save the two per-unit values the OEM wrote once. `S03mac` reads `ethaddr` rather
-than inventing a MAC, and the sensor probe falls back to `sensor`:
+Save the MAC. `ethaddr` is the one value in the environment that nothing can
+reconstruct: `S03mac` reads it rather than inventing a MAC, and this board has
+no equivalent of the Ingenic SoC serial registers that thingino derives one from
+elsewhere.
 
 ```sh
-fw_printenv ethaddr sensor
+fw_printenv ethaddr
 ```
+
+`sensor` needs no saving. `load_sigmastar` probes i2c through `ipcinfo` whenever
+the variable is empty and writes the answer back, so an erased environment
+repairs itself on the next boot.
 
 **The overlay is about to be erased.** `data` moves when the rootfs partition is
 resized, so its jffs2 contents no longer parse and `/init` reformats them.
@@ -86,11 +92,11 @@ rewriting the environment from a booting system.
 Use `fw_setenv`, not a raw write of `u-boot-env.bin`. A stored environment
 replaces the bootloader's compiled defaults wholesale rather than merging with
 them, and `u-boot-env.bin` holds only the variables this build generates. Writing
-it raw therefore discards everything else the unit has — `ethaddr` and `sensor`,
-but also the vendor's `soc`, `updatetool` and the `ubnor`/`uknor`/`urnor` TFTP
-recovery helpers, which are exactly what you want available when a flash goes
-wrong. The camera would still boot, since the generated `bootcmd` is
-self-contained; it would just have lost its recovery tooling.
+it raw therefore discards everything else the unit has — `ethaddr`, and also the
+vendor's `soc`, `updatetool` and the `ubnor`/`uknor`/`urnor` TFTP recovery
+helpers, which are exactly what you want available when a flash goes wrong. The
+camera would still boot, since the generated `bootcmd` is self-contained; it
+would just have lost its MAC and its recovery tooling.
 
 `fw_setenv` is a read-modify-write, so all of that stays:
 
