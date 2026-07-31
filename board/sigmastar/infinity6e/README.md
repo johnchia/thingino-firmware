@@ -16,12 +16,17 @@ erases the partition before writing, so the overlay area is already erased and
 The pieces are emitted separately too, for when you want to change one thing
 rather than everything:
 
-| artifact | offset in the full image | partition | recoverable? |
+| artifact | offset in the full image | partition | if this write goes wrong |
 |---|---|---|---|
-| `u-boot-ssc30kq-nor.bin` | 0x000000 | mtd0 `boot` | **no** |
-| `u-boot-env.bin` | 0x040000 | mtd1 `env` | yes |
-| `uImage` | 0x050000 | mtd2 `kernel` | yes |
-| `rootfs.squashfs` | 0x250000 | mtd3 `rootfs` | yes |
+| `u-boot-ssc30kq-nor.bin` | 0x000000 | mtd0 `boot` | **board is silent — clip only** |
+| `u-boot-env.bin` | 0x040000 | mtd1 `env` | may not boot — clip |
+| `uImage` | 0x050000 | mtd2 `kernel` | may not boot — clip |
+| `rootfs.squashfs` | 0x250000 | mtd3 `rootfs` | may not boot — clip |
+
+Without a serial console every one of those failures looks the same from the
+outside: the camera does not come back on the network. The difference is only
+how much has to be written back, which is why stage 0 keeps both a full dump and
+a 256KB bootloader-only dump.
 
 `uenv.txt` is the same environment in text form: what to read when you want to
 know what the build decided, and the input to `fw_setenv`.
@@ -61,8 +66,43 @@ the reason it is the preferred path.
 The overlay has room, but `/tmp` is tmpfs and is where sysupgrade stages anyway:
 
 ```sh
-scp thingino-<camera>.bin uenv.txt root@<camera>:/tmp/
+scp thingino-<camera>.bin uenv.txt u-boot-ssc30kq-nor.bin root@<camera>:/tmp/
 ```
+
+## Stage 0 — take the dump. This is not optional.
+
+With no serial console attached, a camera that fails to boot tells you nothing:
+it simply does not appear on the network. There is no console to interrupt, no
+message to read, and no software path back in. **The clip and a known-good dump
+are the entire recovery story**, so the dump is taken before anything is
+written, not after something goes wrong.
+
+Power the board down, clip the NOR chip, and read the whole 16MB:
+
+```sh
+flashrom -p <programmer> -r ssc30kq-oem-full.bin
+cp ssc30kq-oem-full.bin ssc30kq-oem-full.bin.keep    # never write to the original
+```
+
+Check it before trusting it. A short or all-0xFF read looks like a file until
+the day you need it:
+
+```sh
+stat -c%s ssc30kq-oem-full.bin                       # expect 16777216
+xxd -s 4      -l 4 -p ssc30kq-oem-full.bin           # expect 49504c5f  ("IPL_")
+xxd -s $((0x250000)) -l 4 -p ssc30kq-oem-full.bin    # expect 68737173  ("hsqs")
+```
+
+Also keep the bootloader alone. Restoring 256KB is much faster than 16MB, and
+it is the only region any of the stages below can break irrecoverably:
+
+```sh
+dd if=ssc30kq-oem-full.bin of=ssc30kq-oem-mtd0.bin bs=64k count=4
+```
+
+**Recovery, at any point from here on:** clip, write `ssc30kq-oem-mtd0.bin` back
+to offset 0 if only the bootloader is suspect, or `ssc30kq-oem-full.bin` whole
+if you want the board exactly as it started.
 
 ## Before you touch anything
 
@@ -131,34 +171,75 @@ Stage 1 is done when the camera boots, streams, and `/proc/mtd` lists `data` and
 `all`. `sysupgrade` now passes `check_upgrade_partitions`, which is the point: it
 is the first moment the update path can be exercised at all.
 
-## Stage 2 — the full image, which replaces the bootloader
+If the camera does not come back, the environment is the only thing that
+changed. mtd0 is untouched, so the bootloader still works and its compiled
+defaults still describe the OEM table — clip and restore the full dump to get
+back to a booting system, then re-apply a corrected `uenv.txt`.
 
-Only after stage 1 is good, and only with the serial console attached and an SPI
-flash clip within reach:
+## Stage 1.5 — the bootloader on its own
+
+This exists because the bootloader is the only component that has never
+executed. Everything else has been running on this board for weeks. Flashing it
+by itself means that if the camera goes quiet, exactly one thing changed, and
+the fix is a 256KB write rather than a diagnosis.
+
+```sh
+flashcp -v /tmp/u-boot-ssc30kq-nor.bin /dev/mtd0
+reboot
+```
+
+**Not `sysupgrade -b`.** That option resolves its payload from GitHub releases,
+not from a local file — `handle_payload` only honours a path argument when the
+mode is `local` — so on this fork it fails before reaching the flash. It also
+truncates its input to 256KB in place, which happens to be right for this board
+and wrong for Ingenic's 320KB boot partition. `flashcp` avoids both.
+
+Stage 1.5 succeeds if the camera comes back on the network at all. It is booting
+a bootloader built here rather than the vendor's, so a successful ssh login is
+the whole test — the kernel, rootfs and environment are unchanged from stage 1.
+
+If it does not come back: clip, write `ssc30kq-oem-mtd0.bin` to offset 0, and
+the board is back to its stage-1 state. Nothing else needs restoring, because
+nothing else was touched.
+
+## Stage 2 — the full image
+
+By the time you get here, stage 1.5 has already written and booted this exact
+bootloader, so stage 2 introduces no new component at all — it writes the same
+mtd0 a second time, alongside a kernel and rootfs already proven in stage 1.
+That is the point of the ordering: the risky write happens once, alone, in
+stage 1.5, where a failure has exactly one cause.
 
 ```sh
 sysupgrade /tmp/thingino-<camera>.bin
 ```
 
-sysupgrade prints its own warning and gives you ten seconds to cancel. It erases
-the `all` partition and writes the image over it, bootloader included. Use `-b`
-against the same image to write mtd0 alone, or `flashcp -v
-u-boot-ssc30kq-nor.bin /dev/mtd0` to do it outside sysupgrade — but there is no
-version of this step that leaves mtd0 untouched.
+sysupgrade prints its own warning and gives you ten seconds to cancel, then
+erases the `all` partition and writes the image over it, bootloader included.
 
-Do not write mtd0 to fix a problem in stage 1. Nothing that can go wrong in
-stage 1 is caused by the bootloader.
+What stage 2 actually proves is the update path, not the image: that a full
+`.bin` is recognised, staged, and flashed end to end. If it fails, the recovery
+is the same clip and the same full dump.
+
+Do not run stage 2 to fix a problem from an earlier stage. Nothing that goes
+wrong in stage 1 is caused by the bootloader, and nothing that goes wrong in
+stage 1.5 is fixed by also rewriting the kernel.
 
 ## Recovery
 
-Until mtd0 is written, there is nothing to recover from: the board boots the
-bootloader it shipped with, and a bad environment or rootfs is fixed from a
-serial console or by reflashing over a working boot.
+There is no serial console in this procedure, so a failed boot is silent — the
+camera simply does not appear on the network. That is the whole diagnostic. The
+clip is the way back in, which is why stage 0 is mandatory rather than advisory.
 
-After mtd0 is written, a failed boot means the SPI flash clip. Read the chip
-back, restore `thingino-<camera>.bin` (or the OEM dump, if one was taken before
-the first mtd0 write — worth doing), and start again. This is the only failure
-mode in the project that software cannot reach, which is why stage 2 is last.
+| symptom | restore |
+|---|---|
+| quiet after stage 1 | nothing — mtd0 is untouched, the bootloader still works. Re-apply a corrected environment |
+| quiet after stage 1.5 | `ssc30kq-oem-mtd0.bin` to offset 0 (256KB) |
+| quiet after stage 2 | `ssc30kq-oem-full.bin` whole (16MB) |
+
+Restoring only the first 256KB is worth trying first in every case: it is the
+fastest write, and the bootloader is the only region whose failure is silent
+rather than diagnosable from a booting system.
 
 ## Reference
 
