@@ -55,6 +55,13 @@ BR2_LINUX_KERNEL_CUSTOM_TARBALL=y
 BR2_LINUX_KERNEL_CUSTOM_TARBALL_LOCATION="https://github.com/openipc/linux/archive/sigmastar-$(SOC_FAMILY).tar.gz"
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
 BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/linux.config"
+
+# Vendor-tree fixes, shared by every SigmaStar family rather than scoped per
+# family: the files they touch are byte-identical across the OpenIPC kernel
+# trees. core.fragment points BR2_LINUX_KERNEL_PATCH at
+# package/all-patches/linux/$(KERNEL_VERSION), which is the Ingenic 4.9 set and
+# must not be applied here.
+BR2_LINUX_KERNEL_PATCH="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/patches"
 BR2_LINUX_KERNEL_UIMAGE=y
 BR2_LINUX_KERNEL_XZ=y
 # BR2_LINUX_KERNEL_INSTALL_TARGET is not set

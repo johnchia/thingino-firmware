@@ -114,28 +114,25 @@ BR2_PACKAGE_WIFI_RTL8188FU=y
 
 BR2_PACKAGE_DROPBEAR=y
 
-# SLOW FIRST BOOT, UNRESOLVED. Recorded here because it looks like a hang.
+# SLOW FIRST BOOT -- FIXED IN THE KERNEL CONFIG, see CONFIG_SS_RNG in
+# board/sigmastar/infinity6b0/linux.config.
 #
-# This kernel has no usable hardware RNG. The vendor tree carries one
-# (drivers/sstar/crypto/char/hw_random/sstar-rng.c, gated on CONFIG_SS_RNG) but
-# it is a platform driver bound by the device-tree compatible "sstar,rng", and
-# that string appears nowhere except in the driver itself -- no device tree in
-# this kernel declares the node, so enabling it would add a driver that never
-# probes.
+# The symptom was a board that looked hung partway through init. With no
+# ethernet, no disk and wlan0 not up yet, the only entropy was interrupt
+# timing, and S02ssl blocks in mbedTLS's getrandom() generating the uhttpd
+# certificate -- init waiting at position 02 for a CRNG only later stages of
+# the same sequence could seed. Typing on a serial console got past it, which
+# is exactly why it went unnoticed on a bench unit and bit a headless one.
 #
-# So the only entropy at boot is interrupt timing, and this board has almost
-# none: no ethernet, no disk, and wlan0 does not exist yet. Meanwhile S02ssl
-# runs at position 02 and generates the uhttpd certificate through mbedTLS,
-# whose entropy poll uses a blocking getrandom(). Init waits at S02 for a CRNG
-# that only the later stages of the same init sequence could seed.
+# The SoC has a hardware TRNG in the RSA/crypto block all along. An earlier
+# reading of this tree concluded otherwise -- that sstar-rng.c was a platform
+# driver bound by a device-tree compatible nothing declares. The commented-out
+# platform_driver in that file is dead by design: mdrv_aes.c calls
+# sstar_rng_probe() directly from the AES driver's probe under CONFIG_SS_RNG,
+# and MS_CRYPTO was already enabled. Only the Kconfig symbol was missing.
 #
-# It resolves on its own, and S01seedrng persists a seed so later boots are
-# fast -- but a fresh flash is a first boot every time. Typing on the serial
-# console feeds the pool from keypress timing and gets past it immediately.
-#
-# Left alone deliberately. Every fix considered so far costs more than the
-# symptom: an entropy daemon is a new package and an init-order change, and a
-# device-tree node needs an RNG register base nobody has verified on this part.
+# Nothing is needed here as a result -- no entropy daemon, no init reordering.
+# The hwrng core's own kthread seeds the pool before userspace starts.
 
 # ipcinfo, and the i2c sensor probe behind it.
 BR2_PACKAGE_IPCTOOL=y

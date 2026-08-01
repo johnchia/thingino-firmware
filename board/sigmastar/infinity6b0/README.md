@@ -181,18 +181,33 @@ Serial console is **115200 8N1** on `ttyS0`; the generated `bootargs` sets
 - hostname `ing-tplink-kasa`, built from the first two underscore-separated
   fields of the target name by `scripts/rootfs_script.sh`
 
-**The first boot is slow, and it looks like a hang.** It is not. This kernel
-has no usable hardware RNG and the board has almost no interrupt traffic to
-seed from — no ethernet, no disk, and `wlan0` does not exist yet. `S02ssl` runs
-at position 02 and generates the uhttpd certificate through mbedTLS, whose
-entropy poll uses a blocking `getrandom()`, so init waits there for a CRNG that
-only the later stages of the same init sequence could seed.
+**The first boot used to stall on entropy, and looked like a hang.** Fixed by
+`CONFIG_SS_RNG=y`, which turns on the SoC's hardware TRNG. Confirm it:
 
-It resolves on its own. **Typing on the serial console gets past it
-immediately**, because keypress timing feeds the entropy pool. `S01seedrng`
-persists a seed afterwards, so later boots are fast — but a fresh flash is a
-first boot every time. See the defconfig for why this is documented rather than
-fixed.
+```sh
+cat /sys/class/misc/hw_random/rng_available   # expect sstar-rng
+cat /proc/sys/kernel/random/entropy_avail     # should climb early in boot
+dmesg | grep -i "sstar-rng"                   # silence is good, see below
+```
+
+The symptom was `S02ssl` blocking in mbedTLS's `getrandom()` to generate the
+uhttpd certificate, with no ethernet, no disk and `wlan0` not up yet to
+generate interrupts. Typing on the serial console got past it — which is why it
+went unnoticed on a bench unit and bit a headless one.
+
+Entropy is credited conservatively: `board/sigmastar/patches` lowers the
+driver's claimed quality from the vendor's 500 to 128, i.e. **1 bit of entropy
+per byte read**. Retune live, without a rebuild:
+
+```sh
+echo 256 > /sys/module/hw_random/parameters/current_quality
+```
+
+The same patch makes a stuck generator return no data rather than stale values,
+because `HAL_RNG_Read()` reads its data register even when the ready bit never
+came up. If `dmesg` shows *"generator appears stuck"*, the TRNG is not running
+and the pool is no longer being credited — that message is the whole reason it
+is there, so do not ignore it.
 
 Confirm the table took:
 
@@ -287,8 +302,10 @@ asserts the table reached the compiled binary rather than trusting that it did.
 - **Kernel but no login** — `/init` failing to mount the overlay. The rootfs is
   squashfs and mounts read-only regardless, so the console should still reach a
   shell; `init=/bin/sh` on the kernel command line isolates it.
-- **Appears to hang late in init** — see the entropy note in Stage 3. Type on
-  the console.
+- **Appears to hang late in init** — this used to be the entropy stall, now
+  fixed by `CONFIG_SS_RNG`. If it recurs, check
+  `cat /sys/class/misc/hw_random/rng_available` and `dmesg | grep sstar-rng`:
+  a stuck TRNG stops crediting the pool and puts the old symptom back.
 
 ## Notes
 
