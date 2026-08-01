@@ -327,25 +327,57 @@ asserts the table reached the compiled binary rather than trusting that it did.
 **RAM and the multimedia carveout.** `arch/arm/cpu/armv7/infinity6b0/chip.c` in
 the bootloader detects DRAM size and sets `memlx`/`memsz` itself — 256MB, 128MB
 and 64MB tiers — and the generated `bootargs` reference those variables rather
-than literals, so one image serves any DRAM population. On the 64MB tier that
-leaves Linux roughly 32MB after a 32MB `mma_heap`. This target streams nothing
-and that carveout is pure loss; shrinking it is a real tuning knob if memory
-gets tight, at the cost of replacing an auto-detected value with a literal.
+than literals, so one image serves any DRAM population.
 
-**The vendor MI bundle is installed, but nothing consumes it yet.**
-`sigmastar-osdrv-infinity6b0` is selected, so the `mi_*` modules load at S20 and
-the MI libraries are on disk. No process dlopens them — there is no streamer on
-this board. They are here for sensor bring-up: `load_sigmastar` inserts
-`mi_sensor`, without which the i2c probe behind `sensor` and `ipcinfo` has
-nothing to talk to. Identifying what is actually fitted is the prerequisite for
-deciding whether streaming is worth pursuing on an 8MB part.
+**The carveout comes out of `LX_MEM`, not alongside it.** The two figures in
+`/proc/cmdline` read as additive and are not, which makes this the easiest thing
+on the board to get wrong by a factor that matters. `dmesg` settles it, since
+reserved and available have to add up to the total.
 
-**Raptor cannot be built for this family yet.** `thingino-raptor`'s
-`VALID_PLATFORMS` has no `INFINITY6B0`, and mapping it onto `INFINITY6E` would
-compile against the wrong vendor headers for silicon that merely resembles it.
-That is a change to the raptor tree, which is owned elsewhere; a diagnosis is
-written up in `~/raptor/HANDOFF-infinity6b0-platform.md`. The space budget above
-is what that work would land in.
+This tree cuts the 64MB tier's pool to 24MB — see the patch in
+`package/sigmastar-uboot/`. The stock 32MB left userspace 25.4MB, which carries
+the streamer alone and cannot absorb a web UI session on top of it:
+
+```
+LX_MEM=0x3FE0000     63.9MB   all Linux is told about
+  mma_heap                    24.0MB   (stock 32.0)
+  cma                          2.0MB
+  kernel image + misc          4.4MB
+  -> userspace                         33.4MB   (stock 25.4)
+```
+
+The 8MB is charged against the video profile, so **the pool size and the
+streamer config move together** — 1080p main is what fits 24MB, and the
+arithmetic is in `config/raptor-ssc333.conf`'s header in the raptor repo, which
+this target installs verbatim for that reason. Changing one without the other
+does not fail loudly: the pool does not resize the streams, it just fails to
+allocate them.
+
+To confirm a change took, `mma_heap` in `/proc/cmdline` and the `Memory:` line
+in `dmesg` — `reserved` should move by the difference. Both are bootloader
+state, so it needs mtd0 rewritten, which a full sysupgrade does.
+
+**The vendor MI bundle backs the streamer.** `sigmastar-osdrv-infinity6b0` puts
+the `mi_*` modules in at S20, ahead of raptor at S31, and the MI libraries on
+disk. The HAL reaches them through `dlopen`, so nothing links against them and a
+missing library is invisible until the first HAL call — which is why the camera
+config names the package as well as `thingino-raptor` selecting it.
+
+`load_sigmastar` also inserts `mi_sensor`, without which the i2c probe behind
+`sensor` and `ipcinfo` has nothing to talk to.
+
+**The streamer runs a config from the raptor repo rather than from Kconfig.**
+`BR2_PACKAGE_THINGINO_RAPTOR_CONF_BASE` names `config/raptor-ssc333.conf`, which
+this target installs as `/etc/raptor.conf`. The SSC30KQ target does the opposite
+and sets its geometry through Kconfig knobs; both are deliberate, and the camera
+configs say why. In short: there the numbers are free choices, here they are
+tied to the pool size by arithmetic that lives in that file's header.
+
+Two things follow. The settings that still come from Kconfig are applied *over*
+that file, and the handful with non-empty defaults overwrite it whether or not
+anyone meant them to — so the camera config restates three of them. And a raptor
+pin bump can change the shipped config, which no `.mk` diff will show: check
+`/etc/raptor.conf` in the squashfs against the repo file after one.
 
 **What this board shares with the SSC30KQ.** The vendor seam in `thingino.mk`,
 the Kconfig guards, `core-sigmastar.fragment`, `soc-sigmastar.fragment`,
