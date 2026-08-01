@@ -16,14 +16,32 @@ THINGINO_RAPTOR_DEPENDENCIES += thingino-raptor-hal thingino-raptor-ipc thingino
 # but it is still declared: dlopen at runtime means the linker will never
 # complain, so build order is the only place this can be stated. Without it a
 # parallel build can install the daemons before the MI libraries exist.
+#
+# Keyed on SOC_FAMILY rather than naming a family. This is a make variable that
+# thingino.mk exports, so unlike the Config.in next door -- where Kconfig cannot
+# see it and the dependency has to be stated by the camera defconfig -- the
+# right package can be named here directly.
+#
+# It read sigmastar-osdrv-infinity6e unconditionally until Infinity6B0 arrived.
+# That does not fail: the 6E bundle builds fine, installs over the 6B0 one file
+# by file, and leaves a board running 6E MI libraries against a 6B0 kernel, plus
+# the 6E sensor blobs on top of whatever the target narrowed itself to. Green
+# build, wrong image, symptoms only at the first HAL call.
 ifeq ($(BR2_SOC_SIGMASTAR),y)
-THINGINO_RAPTOR_DEPENDENCIES += sigmastar-osdrv-infinity6e
+THINGINO_RAPTOR_DEPENDENCIES += sigmastar-osdrv-$(SOC_FAMILY)
 else
 THINGINO_RAPTOR_DEPENDENCIES += ingenic-lib
 endif
 
+# ingenic-musl is a shim for Ingenic's vendor libraries, which SigmaStar does
+# not link -- the guard is on the vendor, not the libc. Unguarded it put
+# libmuslshim.so into an ARM SigmaStar rootfs, which only became reachable when
+# the first musl SigmaStar target appeared: every earlier one was glibc, so the
+# condition had never been true here before.
 ifeq ($(BR2_TOOLCHAIN_USES_MUSL),y)
+ifneq ($(BR2_SOC_SIGMASTAR),y)
 THINGINO_RAPTOR_DEPENDENCIES += ingenic-musl
+endif
 endif
 
 # uclibc shim needed on xburst1 platforms; xburst2 (T40/T41) libs are native uclibc
