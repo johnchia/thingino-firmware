@@ -347,13 +347,28 @@ never claims to be globally unique. `sensor` needs no equivalent treatment;
 
 ### If the environment is lost
 
-A bad CRC in mtd1 makes the bootloader fall back to its compiled defaults, which
-still carry the OEM table with `${rootmtd}` and a 5120k rootfs. A larger rootfs
-then reads as truncated — it will appear to mount and fail later, looking like
-filesystem corruption rather than a partition problem.
+It no longer matters, on a board flashed with a bootloader from this tree. The
+build compiles the generated table into U-Boot as well as writing it to mtd1, so
+a bad CRC there costs nothing — the compiled fallback is the same table, and the
+board boots normally.
 
-Under our own bootloader this is slightly worse than under the OEM one, because
-removing the auto-sizing also removed the accident that rescued it: the OEM
-`sf probe` would read the real rootfs and raise `rootmtd` to 8192k, where ours
-leaves the compiled 5120k standing. Re-apply `uenv.txt` before concluding
-anything about the image.
+This is what `firstboot` needed. It erases mtd1 unless given `-e`, and the two
+ways it is actually triggered — the web UI's *Reset firmware* and a 20-second
+hold of the physical button — both run `firstboot -f` and cannot pass `-e`.
+
+The mechanism mirrors what thingino already does for the Ingenic bootloader at
+`Makefile:1143`: build U-Boot last, after the images exist, with a `dirclean`
+so the build stamp cannot suppress it. Those rules key off the Ingenic artifact
+and package, and `br-all` is a passthrough to Buildroot's `all`, so
+`post-image.sh` re-invokes the SigmaStar package the same way once the sizes are
+known. Both SigmaStar families share `sigmastar-uboot`, so this landed here and
+on Infinity6B0 together. It takes effect only on a board reflashed with the new
+mtd0.
+
+Worth remembering what an older bootloader still does, because that is what a
+unit flashed before this change will show: the compiled defaults carried the OEM
+table with `${rootmtd}` and a 5120k rootfs, so a larger rootfs read as truncated
+— appearing to mount and failing later, which looks like filesystem corruption
+rather than a partition problem. It was worse under our own bootloader than the
+OEM one, because removing the `sf probe` auto-sizing also removed the accident
+that rescued it. Re-apply `uenv.txt` before concluding anything about the image.

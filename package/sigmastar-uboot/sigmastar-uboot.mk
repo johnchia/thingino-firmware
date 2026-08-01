@@ -70,6 +70,23 @@ define SIGMASTAR_UBOOT_BUILD_CMDS
 	cd $(@D) && $(SHELL) make_boot_spinor.sh $(SIGMASTAR_UBOOT_SOC_FAMILY)
 endef
 
+# Compile the real partition table in, so the environment in mtd1 stops being
+# the only copy. See board/sigmastar/uboot-partition-table.sh for why that
+# matters and why the table arrives from post-image.sh rather than being
+# computed here: it depends on rootfs.squashfs, which does not exist while
+# packages build.
+#
+# On the first pass the table file is absent and this is a no-op. post-image.sh
+# then writes the table and re-invokes `sigmastar-uboot-dirclean
+# sigmastar-uboot`, mirroring what thingino's own Makefile does for the Ingenic
+# bootloader at Makefile:1143. The dirclean is what defeats the build stamp.
+define SIGMASTAR_UBOOT_PATCH_TABLE
+	$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/uboot-partition-table.sh \
+		$(@D)/include/configs/sstar-common.h \
+		$(BINARIES_DIR)/sigmastar-mtdparts.env
+endef
+SIGMASTAR_UBOOT_PRE_BUILD_HOOKS += SIGMASTAR_UBOOT_PATCH_TABLE
+
 define SIGMASTAR_UBOOT_INSTALL_IMAGES_CMDS
 	$(INSTALL) -D -m 0644 $(@D)/BOOT.bin \
 		$(BINARIES_DIR)/u-boot-$(SIGMASTAR_UBOOT_SOC_MODEL)-nor.bin
