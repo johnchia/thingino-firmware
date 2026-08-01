@@ -54,6 +54,21 @@ endif
 # Platform: uppercase SOC_FAMILY (t31 -> T31)
 THINGINO_RAPTOR_PLATFORM = $(shell echo $(SOC_FAMILY) | tr a-z A-Z)
 
+# The base config installed as /etc/raptor.conf, before THINGINO_RAPTOR_PATCH_CONF
+# applies the defconfig's settings to it. Empty is the generic config/raptor.conf.
+#
+# The raptor repo also carries board-tuned configs named for the SoC model --
+# config/raptor-ssc333.conf -- whose stream geometry is sized against a specific
+# part's multimedia pool. A board tight enough to need that sizing names one, and
+# gets it from the repo rather than from a copy in this tree that would drift.
+#
+# Named rather than inferred from SOC_MODEL. These configs are not confined to
+# the keys a defconfig can set, so picking one up by filename would change more
+# than geometry: raptor-ssc30kq.conf carries [ircut] gpio pins, and the ssc30kq
+# board resolves its GPIO map from thingino.json instead precisely because ric
+# consults raptor.conf first. Inferring the file would quietly reverse that.
+THINGINO_RAPTOR_CONF = $(call qstrip,$(BR2_PACKAGE_THINGINO_RAPTOR_CONF_BASE))
+
 # Feature flags
 ifeq ($(BR2_PACKAGE_THINGINO_RAPTOR_AAC),y)
 THINGINO_RAPTOR_MAKE_OPTS += AAC=1
@@ -184,9 +199,22 @@ define THINGINO_RAPTOR_INSTALL_TARGET_CMDS
 				$(TARGET_DIR)/usr/bin/$(t); \
 		fi$(sep))
 
-	# Config — use the canonical config from the raptor repo
-	$(INSTALL) -D -m 0644 $(@D)/config/raptor.conf \
-		$(TARGET_DIR)/etc/raptor.conf
+	# Config — the base named by THINGINO_RAPTOR_CONF, else the canonical one.
+	# A named file that is not in the tree is fatal rather than a fallback: the
+	# fallback is generic defaults, which on a board that named a tuned config
+	# is a silent downgrade to geometry its memory pool cannot hold.
+	if [ -n "$(THINGINO_RAPTOR_CONF)" ]; then \
+		if [ ! -f $(@D)/$(THINGINO_RAPTOR_CONF) ]; then \
+			echo "thingino-raptor: $(THINGINO_RAPTOR_CONF) is not in the raptor tree" >&2; \
+			exit 1; \
+		fi; \
+		echo "thingino-raptor: /etc/raptor.conf from $(THINGINO_RAPTOR_CONF)"; \
+		$(INSTALL) -D -m 0644 $(@D)/$(THINGINO_RAPTOR_CONF) \
+			$(TARGET_DIR)/etc/raptor.conf; \
+	else \
+		$(INSTALL) -D -m 0644 $(@D)/config/raptor.conf \
+			$(TARGET_DIR)/etc/raptor.conf; \
+	fi
 
 	# Web pages (editable on device)
 	$(INSTALL) -D -m 0644 $(@D)/rhd/index.html \
@@ -244,7 +272,7 @@ endef
 # does not. Buildroot reads _VERSION and _SITE when generic-package is
 # evaluated, which is the line below, so this is still in time.
 ifeq ($(BR2_SOC_SIGMASTAR),y)
-THINGINO_RAPTOR_VERSION = fca78d94187cc63be26c1413b8000d9353639473
+THINGINO_RAPTOR_VERSION = 0c1b2908ce98782562e29449258a0ef590d3cd62
 THINGINO_RAPTOR_SITE = https://github.com/johnchia/raptor
 endif
 

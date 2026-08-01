@@ -34,7 +34,7 @@ endef
 # raptor repositories come from one place and one branch. Point it back at
 # gtxaspec the moment the branch is merged there.
 ifeq ($(BR2_SOC_SIGMASTAR),y)
-THINGINO_RAPTOR_COMMON_VERSION = 6e2e674803415a4ed2d99c70a2ade7c3be373a7d
+THINGINO_RAPTOR_COMMON_VERSION = ab8cff88fd989fb27045a5964395b4fc48e1ab6f
 THINGINO_RAPTOR_COMMON_SITE = https://github.com/johnchia/raptor-common
 endif
 
