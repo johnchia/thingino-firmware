@@ -1,7 +1,22 @@
 # SSC333 (Infinity6B0) — TP-Link Kasa KD110 v2
 
 **Verified on hardware.** The board boots to a serial login, brings up Wi-Fi
-without any GPIO intervention, and serves its captive portal.
+without any GPIO intervention, and serves its captive portal. Since then, also
+confirmed on the unit:
+
+- **Boot no longer stalls on entropy.** `CONFIG_SS_RNG` was the whole fix; a
+  headless unit reaches userspace without anyone touching the console.
+- **`sysupgrade` works.** The board takes a full image over the network, so the
+  SOIC clip is no longer the only way to update it. That also exercises the
+  compiled-in partition table: a full sysupgrade rewrites `all`, mtd0 included,
+  so the bootloader now on the chip is one carrying its own table.
+- **Video works.** Raptor streams on this board — see the streamer note below.
+
+**No ethernet.** The KD110v2 has a debug header and nothing else: no MAC pins
+brought out, no PHY, no magnetics. The kernel is built without the wired stack
+(`MS_EMAC`, `SSTAR_NETPHY`, `PHYLIB`, `MII`, `SWPHY`, `FIXED_PHY`), which is
+worth 24KB. Wi-Fi is untouched by that — the RTL8188FU is a USB cfg80211 device
+and shares nothing with the wired path.
 
 The unit arrived running OpenIPC with **no working ethernet and no working
 Wi-Fi**, reachable only over a serial console. That single fact set the whole
