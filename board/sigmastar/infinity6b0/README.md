@@ -248,23 +248,45 @@ AP does not close itself. Upstream bug, not carried as a local patch.
 ## Resetting to a fresh state
 
 `firstboot` erases the overlay and reboots — the way to retest first-boot
-behaviour including the portal. **Use `-e`:**
+behaviour including the portal. It erases `/dev/mtd1` too unless given `-e`,
+and on this board mtd1 is the env holding the generated partition table.
 
 ```sh
 firstboot -e        # -e: do NOT erase /dev/mtd1.  -f: skip the confirmation
 ```
 
-By default `firstboot` *also* erases `/dev/mtd1`, which on this board is the
-env partition holding the generated partition table. The bootloader's
-compiled-in fallback is
+**`-e` is now a convenience rather than a requirement**, on a board flashed
+with a bootloader from this tree. The compiled-in fallback used to be the OEM's
 
 ```
 mtdparts=NOR_FLASH:256k(boot),64k(env),2048k(kernel),${rootmtd}(rootfs),-(rootfs_data)
 ```
 
-— no `data`, no `all`, and a fixed 2048k kernel where this build's is larger,
-so the rootfs offset would land inside the kernel. Recoverable by writing
-`u-boot-env.bin` back to offset `0x40000`, but that is another clip session.
+— a fixed 2048k kernel where this build's is 1792k, so the rootfs offset landed
+inside the kernel and `panic=20` turned it into a reboot loop. It is now sized
+to the kernel this build produced, by
+`board/sigmastar/uboot-recovery-table.sh`:
+
+```
+mtdparts=NOR_FLASH:256k(boot),64k(env),1792k(kernel),-(rootfs)
+```
+
+Losing the environment therefore costs a read-only boot, not a loop: mtdblock3
+lands exactly on the real rootfs, `/init` fails to find a partition named `data`
+and its EXIT trap execs `/sbin/init` anyway. Expect a serial console and no
+network — dropbear wants to write host keys into `/etc`, and wlan0 wants a
+`wpa_supplicant.conf` from the overlay. Write `u-boot-env.bin` back to offset
+`0x40000`, or re-flash, to leave that state.
+
+**Why this matters beyond the bench.** The web UI's *Reset firmware* runs
+`firstboot -f`, and a 20-second hold of the physical button runs the same
+command. Neither can pass `-e`. Before this fix, a factory reset from the web UI
+left the board recoverable only over serial.
+
+> **Unrelated and still live: do not use the web UI's *Wipe overlay*.** It runs
+> `flash_eraseall -j /dev/mtd2`, a hardcoded index that predates the layout
+> change in `3b7997b46`. On this table mtd2 is the **kernel**, not the overlay.
+> See `UPSTREAM-CANDIDATES.md`.
 
 ## If it does not come up
 
