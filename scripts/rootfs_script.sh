@@ -45,10 +45,9 @@ else
 	TOOLCHAIN_TYPE="unknown"
 fi
 
-# Derived rather than hardcoded: this was a literal ARCHITECTURE=mips below,
-# which is right for Ingenic and wrong for any other target. /etc/os-release is
-# read at runtime -- `soc -a` reports from it and the web UI displays it -- so on
-# an ARM board it was reporting mips.
+# Derived from the Buildroot config rather than assumed. /etc/os-release is read
+# at runtime -- `soc -a` reports from it and the web UI displays it -- so this
+# value is user-visible and should describe what was actually built.
 if grep -q "^BR2_arm=y\|^BR2_armeb=y" "$BR2_CONFIG"; then
 	ARCHITECTURE="arm"
 elif grep -q "^BR2_aarch64=y\|^BR2_aarch64_be=y" "$BR2_CONFIG"; then
