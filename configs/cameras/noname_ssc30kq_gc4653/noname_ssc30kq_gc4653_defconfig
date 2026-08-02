@@ -12,30 +12,8 @@
 # builds it from the first two underscore fields, giving ing-openipc-ssc30kq.
 # This name gives ing-noname-ssc30kq.
 #
-# Note the sensor belongs in the target name because thingino ships one target
-# per silicon combination (cf. the eight tplink_tapo variants). That is a
-# *naming* convention only: this target still installs all six Infinity6E sensor
-# configs and autodetects at runtime, so one image runs on any SSC30KQ board.
-#
-# BR2_SENSOR_1_NAME is deliberately unset, and this is the one camera with a
-# sensor where that is true -- 169 of the other 170 set it, and the exception is
-# an A1 NVR that Config.sensor.in excludes for having no sensor at all. The
-# symbol is not inert-by-accident here: thingino.mk exports SENSOR_1_MODEL and
-# ingenic-sdk is its only consumer, using it to pick which sensor driver and IQ
-# blob to build. This board builds no ingenic-sdk, so setting it would declare a
-# fact nothing reads.
-#
-# The runtime difference is real and worth keeping. On Ingenic the sensor is
-# chosen at build time and /proc/jz/sensor merely reports back what the single
-# shipped driver registered; there is no probe. Here load_sigmastar inserts
-# sensor_config.ko, probes i2c through ipcinfo, binds the matching driver out of
-# all six, and caches the answer in the U-Boot `sensor` variable.
-#
-# That probe is why `sensor` does not have to survive a full sysupgrade. The
-# upgrade erases the whole chip including the environment; the next boot finds
-# the variable empty, re-probes, and writes it back. Declaring the sensor
-# statically would trade a self-healing path for one that needs the environment
-# restored by hand.
+# The sensor belongs in the target name because thingino ships one target per
+# silicon combination (cf. the eight tplink_tapo variants).
 # FRAG: soc-infinity6e core-sigmastar ssl-mbedtls
 
 # board.mk includes this file as a makefile before thingino.mk runs, so these
@@ -44,6 +22,13 @@
 # way it drops FLASH_SIZE_MB in the Ingenic camera configs.
 BR2_SIGMASTAR_SOC_MODEL="ssc30kq"
 BR2_SIGMASTAR_SOC_FAMILY="infinity6e"
+
+# Selects which IQ blob sigmastar-osdrv-infinity6e installs to
+# /usr/share/sensor. raptor still probes i2c at runtime and binds whichever of
+# the six drivers matches, so a board carrying a different sensor streams
+# normally on the generic /etc/firmware/iqfile0.bin -- the cost is colour, not
+# function. BR2_SENSOR_1_IQ_FILE overrides the blob with a board-specific one.
+BR2_SENSOR_1_NAME="gc4653"
 
 FLASH_SIZE_MB=16
 

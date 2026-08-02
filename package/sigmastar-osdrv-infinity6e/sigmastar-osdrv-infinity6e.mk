@@ -38,6 +38,13 @@ SIGMASTAR_OSDRV_INFINITY6E_REDISTRIBUTE = NO
 SIGMASTAR_OSDRV_INFINITY6E_DEPENDENCIES = linux
 SIGMASTAR_OSDRV_INFINITY6E_KREL = $(LINUX_VERSION_PROBED)
 
+# Board-specific tuning, path relative to the BR2_EXTERNAL root as ingenic-sdk
+# reads it. Left unset the stock blob is installed.
+ifneq ($(call qstrip,$(BR2_SENSOR_1_IQ_FILE)),)
+SIGMASTAR_OSDRV_INFINITY6E_IQ_OVERRIDE = \
+	$(BR2_EXTERNAL_THINGINO_PATH)/$(call qstrip,$(BR2_SENSOR_1_IQ_FILE))
+endif
+
 define SIGMASTAR_OSDRV_INFINITY6E_INSTALL_TARGET_CMDS
 	$(INSTALL) -m 755 -d $(TARGET_DIR)/lib/modules/$(SIGMASTAR_OSDRV_INFINITY6E_KREL)/sigmastar
 	$(INSTALL) -m 644 -t $(TARGET_DIR)/lib/modules/$(SIGMASTAR_OSDRV_INFINITY6E_KREL)/sigmastar \
@@ -51,16 +58,29 @@ define SIGMASTAR_OSDRV_INFINITY6E_INSTALL_TARGET_CMDS
 	$(INSTALL) -m 644 -t $(TARGET_DIR)/etc/firmware \
 		$(SIGMASTAR_OSDRV_INFINITY6E_PKGDIR)/files/sensor/firmware/*
 
-	# ALL SIX sensor configs, always. OpenIPC's version of this package
-	# narrows the glob with $(OPENIPC_SNS_MODEL) to install only the sensor
-	# the developer's board happens to have. That knob is deliberately not
-	# reproduced: this target is one image for any SSC30KQ board, and baking
-	# in the dev unit's sensor would silently break every other board. The
-	# whole directory is ~1MB raw and ~130KB once squashfs xz'es it, so
-	# there is nothing to win by narrowing.
-	$(INSTALL) -m 755 -d $(TARGET_DIR)/etc/sensors
-	$(INSTALL) -m 644 -t $(TARGET_DIR)/etc/sensors \
-		$(SIGMASTAR_OSDRV_INFINITY6E_PKGDIR)/files/sensor/configs/*.bin
+	# One sensor per target, in the shape ingenic-sdk installs: the blob under
+	# /usr/share/sensor, an /etc/sensor symlink, and a model file.
+	#
+	# The plain <sensor>.bin name is required. raptor resolves the tuning by
+	# the lowercased driver-module name, so ingenic-sdk's -$(SOC_FAMILY) suffix
+	# would not be found and the board would come up on the generic tuning with
+	# visibly wrong colour.
+	#
+	# All six blobs stay checked in -- another SSC30KQ target selects its own.
+	if [ -n "$(SENSOR_1_MODEL)" ]; then \
+		$(INSTALL) -m 755 -d $(TARGET_DIR)/usr/share/sensor; \
+		ln -sf /usr/share/sensor $(TARGET_DIR)/etc/sensor; \
+		if [ -n "$(SIGMASTAR_OSDRV_INFINITY6E_IQ_OVERRIDE)" ] && \
+		   [ -f "$(SIGMASTAR_OSDRV_INFINITY6E_IQ_OVERRIDE)" ]; then \
+			$(INSTALL) -D -m 644 $(SIGMASTAR_OSDRV_INFINITY6E_IQ_OVERRIDE) \
+				$(TARGET_DIR)/usr/share/sensor/$(SENSOR_1_MODEL).bin; \
+		else \
+			$(INSTALL) -D -m 644 \
+				$(SIGMASTAR_OSDRV_INFINITY6E_PKGDIR)/files/sensor/configs/$(SENSOR_1_MODEL).bin \
+				$(TARGET_DIR)/usr/share/sensor/$(SENSOR_1_MODEL).bin; \
+		fi; \
+		echo $(SENSOR_1_MODEL) > $(TARGET_DIR)/usr/share/sensor/model; \
+	fi
 
 	$(INSTALL) -m 755 -d $(TARGET_DIR)/usr/bin
 	$(INSTALL) -m 755 -t $(TARGET_DIR)/usr/bin \
