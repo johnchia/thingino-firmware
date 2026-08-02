@@ -16,14 +16,32 @@ THINGINO_RAPTOR_DEPENDENCIES += thingino-raptor-hal thingino-raptor-ipc thingino
 # but it is still declared: dlopen at runtime means the linker will never
 # complain, so build order is the only place this can be stated. Without it a
 # parallel build can install the daemons before the MI libraries exist.
+#
+# Keyed on SOC_FAMILY rather than naming a family. This is a make variable that
+# thingino.mk exports, so unlike the Config.in next door -- where Kconfig cannot
+# see it and the dependency has to be stated by the camera defconfig -- the
+# right package can be named here directly.
+#
+# It read sigmastar-osdrv-infinity6e unconditionally until Infinity6B0 arrived.
+# That does not fail: the 6E bundle builds fine, installs over the 6B0 one file
+# by file, and leaves a board running 6E MI libraries against a 6B0 kernel, plus
+# the 6E sensor blobs on top of whatever the target narrowed itself to. Green
+# build, wrong image, symptoms only at the first HAL call.
 ifeq ($(BR2_SOC_SIGMASTAR),y)
-THINGINO_RAPTOR_DEPENDENCIES += sigmastar-osdrv-infinity6e
+THINGINO_RAPTOR_DEPENDENCIES += sigmastar-osdrv-$(SOC_FAMILY)
 else
 THINGINO_RAPTOR_DEPENDENCIES += ingenic-lib
 endif
 
+# ingenic-musl is a shim for Ingenic's vendor libraries, which SigmaStar does
+# not link -- the guard is on the vendor, not the libc. Unguarded it put
+# libmuslshim.so into an ARM SigmaStar rootfs, which only became reachable when
+# the first musl SigmaStar target appeared: every earlier one was glibc, so the
+# condition had never been true here before.
 ifeq ($(BR2_TOOLCHAIN_USES_MUSL),y)
+ifneq ($(BR2_SOC_SIGMASTAR),y)
 THINGINO_RAPTOR_DEPENDENCIES += ingenic-musl
+endif
 endif
 
 # uclibc shim needed on xburst1 platforms; xburst2 (T40/T41) libs are native uclibc
@@ -35,6 +53,21 @@ endif
 
 # Platform: uppercase SOC_FAMILY (t31 -> T31)
 THINGINO_RAPTOR_PLATFORM = $(shell echo $(SOC_FAMILY) | tr a-z A-Z)
+
+# The base config installed as /etc/raptor.conf, before THINGINO_RAPTOR_PATCH_CONF
+# applies the defconfig's settings to it. Empty is the generic config/raptor.conf.
+#
+# The raptor repo also carries board-tuned configs named for the SoC model --
+# config/raptor-ssc333.conf -- whose stream geometry is sized against a specific
+# part's multimedia pool. A board tight enough to need that sizing names one, and
+# gets it from the repo rather than from a copy in this tree that would drift.
+#
+# Named rather than inferred from SOC_MODEL. These configs are not confined to
+# the keys a defconfig can set, so picking one up by filename would change more
+# than geometry: raptor-ssc30kq.conf carries [ircut] gpio pins, and the ssc30kq
+# board resolves its GPIO map from thingino.json instead precisely because ric
+# consults raptor.conf first. Inferring the file would quietly reverse that.
+THINGINO_RAPTOR_CONF = $(call qstrip,$(BR2_PACKAGE_THINGINO_RAPTOR_CONF_BASE))
 
 # Feature flags
 ifeq ($(BR2_PACKAGE_THINGINO_RAPTOR_AAC),y)
@@ -166,9 +199,22 @@ define THINGINO_RAPTOR_INSTALL_TARGET_CMDS
 				$(TARGET_DIR)/usr/bin/$(t); \
 		fi$(sep))
 
-	# Config — use the canonical config from the raptor repo
-	$(INSTALL) -D -m 0644 $(@D)/config/raptor.conf \
-		$(TARGET_DIR)/etc/raptor.conf
+	# Config — the base named by THINGINO_RAPTOR_CONF, else the canonical one.
+	# A named file that is not in the tree is fatal rather than a fallback: the
+	# fallback is generic defaults, which on a board that named a tuned config
+	# is a silent downgrade to geometry its memory pool cannot hold.
+	if [ -n "$(THINGINO_RAPTOR_CONF)" ]; then \
+		if [ ! -f $(@D)/$(THINGINO_RAPTOR_CONF) ]; then \
+			echo "thingino-raptor: $(THINGINO_RAPTOR_CONF) is not in the raptor tree" >&2; \
+			exit 1; \
+		fi; \
+		echo "thingino-raptor: /etc/raptor.conf from $(THINGINO_RAPTOR_CONF)"; \
+		$(INSTALL) -D -m 0644 $(@D)/$(THINGINO_RAPTOR_CONF) \
+			$(TARGET_DIR)/etc/raptor.conf; \
+	else \
+		$(INSTALL) -D -m 0644 $(@D)/config/raptor.conf \
+			$(TARGET_DIR)/etc/raptor.conf; \
+	fi
 
 	# Web pages (editable on device)
 	$(INSTALL) -D -m 0644 $(@D)/rhd/index.html \
@@ -226,7 +272,7 @@ endef
 # does not. Buildroot reads _VERSION and _SITE when generic-package is
 # evaluated, which is the line below, so this is still in time.
 ifeq ($(BR2_SOC_SIGMASTAR),y)
-THINGINO_RAPTOR_VERSION = fca78d94187cc63be26c1413b8000d9353639473
+THINGINO_RAPTOR_VERSION = 0c1b2908ce98782562e29449258a0ef590d3cd62
 THINGINO_RAPTOR_SITE = https://github.com/johnchia/raptor
 endif
 

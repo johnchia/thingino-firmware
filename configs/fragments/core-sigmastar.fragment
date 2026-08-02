@@ -41,14 +41,27 @@ BR2_SYSTEM_DEFAULT_PATH="/bin:/sbin:/usr/bin:/usr/sbin"
 BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_THINGINO_PATH)/overlay"
 BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/scripts/rootfs_script.sh"
 
-# Kernel: the OpenIPC sigmastar-infinity6e tree, as a tarball. thingino's
+# Kernel: the OpenIPC sigmastar-<family> tree, as a tarball. thingino's
 # Ingenic path uses BR2_LINUX_KERNEL_CUSTOM_GIT with KERNEL_SITE/BRANCH/HASH;
 # those variables are not set for this vendor (see thingino.mk).
+#
+# Both paths are keyed on SOC_FAMILY, so a new SigmaStar family needs no edit
+# here: it needs a board/sigmastar/<family>/ directory with a linux.config in
+# it. The file is named for its role rather than for the reference board it
+# came from -- the OpenIPC name is recorded in the file's own header, where it
+# stays attached to the contents rather than to a path every family repeats.
 BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_CUSTOM_TARBALL=y
 BR2_LINUX_KERNEL_CUSTOM_TARBALL_LOCATION="https://github.com/openipc/linux/archive/sigmastar-$(SOC_FAMILY).tar.gz"
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
-BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/infinity6e-ssc012b.config"
+BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/linux.config"
+
+# Vendor-tree fixes, shared by every SigmaStar family rather than scoped per
+# family: the files they touch are byte-identical across the OpenIPC kernel
+# trees. core.fragment points BR2_LINUX_KERNEL_PATCH at
+# package/all-patches/linux/$(KERNEL_VERSION), which is the Ingenic 4.9 set and
+# must not be applied here.
+BR2_LINUX_KERNEL_PATCH="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/patches"
 BR2_LINUX_KERNEL_UIMAGE=y
 BR2_LINUX_KERNEL_XZ=y
 # BR2_LINUX_KERNEL_INSTALL_TARGET is not set

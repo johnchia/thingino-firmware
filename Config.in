@@ -175,6 +175,7 @@ source "$BR2_EXTERNAL_THINGINO_PATH/package/thingino-webui/Config.in"
 # BR2_SOC_SIGMASTAR, so an Ingenic build sees four more invisible options and
 # nothing else changes.
 source "$BR2_EXTERNAL_THINGINO_PATH/package/ipctool/Config.in"
+source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-osdrv-infinity6b0/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-osdrv-infinity6e/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-osdrv-sensors/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-uboot/Config.in"

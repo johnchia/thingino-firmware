@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# No-op override of thingino's S03mac on a board with no wired interface.
+#
+# The base script exists to seed eth.mac from the SoC's serial-number
+# registers. It reads them with devmem at 0x13540200/04/08 and 0x1354023C,
+# which are Ingenic addresses: on Infinity6B0 they are outside the RIU window
+# and every read takes an external abort rather than returning zeros.
+#
+#   Unhandled fault: external abort on non-linefetch (0x008) at ...
+#
+# That is the whole reason this file is here. The base script's own guard --
+# all four words zero means no serial, exit -- never gets the chance to run,
+# and STRICT_DEVMEM is off so nothing prevents the access.
+#
+# Doing nothing is the correct behaviour on this board rather than merely the
+# safe one. There is no ethernet interface for eth.mac to describe, and wlan0
+# takes its address from the Wi-Fi module's own EFUSE. S04hostname's precedence
+# chain is `soc -s`, then wlan.mac, then ethaddr, then the interface address,
+# so with `soc -s` returning nothing (see overlay/usr/sbin/soc, where the
+# Infinity6B0 OTP registers are recorded as unverified) the hostname comes from
+# the Wi-Fi address and needs nothing from here.
+#
+# If this board ever gains a wired interface, or the OTP die ID is confirmed on
+# Infinity6B0, replace this with the Infinity6E camera's S03mac rather than
+# with the base one -- that version derives the MAC from the die ID and never
+# consults ethaddr, which is what makes it survive a full sysupgrade.
+#
+# Camera overlay rather than an edit to the shared overlay: Makefile:598
+# appends this directory after the base one, so this wins with zero merge
+# surface upstream.
+
+exit 0

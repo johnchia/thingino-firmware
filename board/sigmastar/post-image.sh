@@ -1,19 +1,26 @@
 #!/bin/sh
 #
-# Size the SSC30KQ's flash partitions to the built images and emit the U-Boot
-# environment that describes them.
+# Size a SigmaStar board's flash partitions to the built images and emit the
+# U-Boot environment that describes them.
+#
+# Shared by every SigmaStar family rather than copied per board. Nothing in
+# here is family-specific: the flash size comes from the camera defconfig's
+# FLASH_SIZE_MB, the two fixed partitions are properties of the bootloader
+# this tree builds, and the rest is arithmetic on the images just produced.
 #
 # The partition table is a property of the environment, not of the board. The
 # kernel takes it from the cmdline (CONFIG_MTD_CMDLINE_PARTS=y,
-# CONFIG_MTD_OF_PARTS unset), U-Boot builds the cmdline from ${bootargs}, and
-# this script writes ${bootargs}. Nothing reads a device tree for it.
+# CONFIG_MTD_OF_PARTS unset -- checked on both Infinity6E and Infinity6B0),
+# U-Boot builds the cmdline from ${bootargs}, and this script writes
+# ${bootargs}. Nothing reads a device tree for it, despite these kernels
+# carrying a CONFIG_SS_DTB_NAME.
 #
 #   mtd0  "boot"     256KB   fixed -- mask-ROM container, see sigmastar-uboot.mk
 #   mtd1  "env"       64KB   fixed -- must match the bootloader's CONFIG_ENV_*
 #   mtd2  "kernel"           sized to uImage, 64KB-aligned
 #   mtd3  "rootfs"           sized to rootfs.squashfs, 64KB-aligned
 #   mtd4  "data"             the remainder; jffs2 overlay upperdir
-#   mtd5  "all"       16MB   whole chip at offset 0, overlapping the rest
+#   mtd5  "all"              whole chip at offset 0, overlapping the rest
 #
 # The two fixed sizes are not free choices. The bootloader is compiled with
 # CONFIG_ENV_OFFSET 0x40000 and CONFIG_ENV_SIZE 0x10000, so "boot" must be
@@ -55,7 +62,7 @@
 set -eu
 
 BINARIES_DIR="$1"
-IMAGE_NAME="ssc30kq_${OPENIPC_VARIANT:-image}"
+IMAGE_NAME="${SOC_MODEL:-sigmastar}_image"
 
 ALIGN=65536
 FLASH_KB=$((${FLASH_SIZE_MB:-16} * 1024))
@@ -141,6 +148,89 @@ fi
 report_sized "uImage" "$(wc -c <"$KERNEL_BIN")" "$KERNEL_PART"
 report_sized "rootfs.squashfs" "$(wc -c <"$ROOTFS_BIN")" "$ROOTFS_PART"
 
+MTDPARTS="NOR_FLASH:${BOOT_KB}k(boot),${ENV_KB}k(env),${KERNEL_KB}k(kernel),${ROOTFS_KB}k(rootfs),${DATA_KB}k(data),${FLASH_KB}k@0(all)"
+
+# COMPILE THE TABLE INTO THE BOOTLOADER, NOT ONLY INTO THE ENVIRONMENT.
+#
+# The environment is not durable. `firstboot` erases mtd1 unless given -e, and
+# the two ways a user actually triggers it -- the web UI's "Reset firmware" and
+# a 20-second hold of the physical button -- both run `firstboot -f` and neither
+# can pass -e. If the environment were the only copy of the table, a factory
+# reset would leave the bootloader describing the vendor's layout, the rootfs
+# offset would land inside the kernel, and panic=20 would turn that into a
+# reboot loop recoverable only over serial.
+#
+# thingino already solves this for Ingenic, in its own Makefile rather than in
+# Buildroot: Makefile:1143 makes the bootloader depend on the generated uenv.txt
+# and rebuilds it with `uboot-dirclean uboot`, so it compiles last, after the
+# images exist. Those rules key off the Ingenic artifact and the Ingenic uboot
+# package, and `br-all` is a straight passthrough to Buildroot's `all`
+# (Makefile:921), so a SigmaStar board never reaches them.
+#
+# So do the same thing from here, which is the first point in the build where
+# the table is known. The dirclean is not optional: a pre-build hook does not
+# re-run while the package's build stamp stands.
+#
+# Only the bootloader is rebuilt, never `all`, so this does not re-enter
+# post-image.sh. MAKEFLAGS is scrubbed because this runs inside a make recipe
+# and the sub-make must not inherit a jobserver it has no token for.
+TABLE_ENV="$BINARIES_DIR/sigmastar-mtdparts.env"
+
+{
+	echo "MTDPARTS='$MTDPARTS'"
+	echo "KERN_ADDR=$KERN_ADDR"
+	echo "KERNEL_PART=$KERNEL_PART"
+	echo "ROOT_ADDR=$ROOT_ADDR"
+	echo "ROOTFS_PART=$ROOTFS_PART"
+	echo "DATA_ADDR=$DATA_ADDR"
+} >"$TABLE_ENV"
+
+# Skipped when the bootloader is not part of this build -- a board flashed by
+# some other means still gets a correct environment, it just has no bootloader
+# here to compile the table into.
+if grep -q '^BR2_PACKAGE_SIGMASTAR_UBOOT=y' "${BR2_CONFIG:-/dev/null}" 2>/dev/null; then
+	THINGINO_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+
+	if [ ! -d "$THINGINO_DIR/buildroot" ]; then
+		echo "ERROR: $IMAGE_NAME cannot find buildroot from $THINGINO_DIR." >&2
+		exit 1
+	fi
+
+	echo "$IMAGE_NAME rebuilding sigmastar-uboot with the generated table"
+	REBUILD_LOG="$BINARIES_DIR/.sigmastar-uboot-rebuild.log"
+	if ! env -u MAKEFLAGS -u MAKELEVEL -u MFLAGS \
+		make -C "$THINGINO_DIR/buildroot" O="${O:?post-image: O is unset}" \
+		sigmastar-uboot-dirclean sigmastar-uboot >"$REBUILD_LOG" 2>&1; then
+		echo "ERROR: $IMAGE_NAME failed to rebuild sigmastar-uboot with the table." >&2
+		tail -30 "$REBUILD_LOG" >&2
+		exit 1
+	fi
+	grep '^sigmastar-uboot compiled-in table' "$REBUILD_LOG" || true
+
+	# Assert the table reached the binary rather than trusting that the hook
+	# ran. This is the check that catches the whole mechanism silently not
+	# firing -- a stale build stamp, a renamed header, a hook that patched a
+	# copy of the tree Buildroot then overwrote. Without it the failure is a
+	# bootloader that looks fine until the day an environment is lost, which is
+	# the failure this entire path exists to prevent.
+	UBOOT_ELF="$BUILD_DIR/sigmastar-uboot-$(sed -n 's/^SIGMASTAR_UBOOT_VERSION *= *//p' \
+		"$THINGINO_DIR/package/sigmastar-uboot/sigmastar-uboot.mk")/u-boot.bin"
+	if [ -f "$UBOOT_ELF" ]; then
+		if strings -a "$UBOOT_ELF" | grep -qF "mtdparts=$MTDPARTS"; then
+			printf '%s %-24s %s\n' "$IMAGE_NAME" "compiled-in table" "verified in u-boot.bin"
+		else
+			echo "ERROR: $IMAGE_NAME the rebuilt bootloader does not carry the table." >&2
+			echo "       Expected: mtdparts=$MTDPARTS" >&2
+			echo "       Losing the environment would leave this board unbootable." >&2
+			rc=1
+		fi
+	else
+		echo "WARNING: $IMAGE_NAME cannot find u-boot.bin to verify the compiled-in" >&2
+		echo "         table at $UBOOT_ELF -- the build tree layout changed." >&2
+		rc=1
+	fi
+fi
+
 # Built only when sigmastar-uboot is selected, and building it is not flashing
 # it -- the board boots whatever is already in mtd0. Checked because it has the
 # least headroom of the three artifacts and its overflow is the one discovered
@@ -152,8 +242,6 @@ for boot_bin in "$BINARIES_DIR"/u-boot-*-nor.bin; do
 	check_fixed "$(basename "$boot_bin")" "$boot_bin" $((BOOT_KB * 1024)) || rc=1
 	BOOT_BIN="$boot_bin"
 done
-
-MTDPARTS="NOR_FLASH:${BOOT_KB}k(boot),${ENV_KB}k(env),${KERNEL_KB}k(kernel),${ROOTFS_KB}k(rootfs),${DATA_KB}k(data),${FLASH_KB}k@0(all)"
 
 BOOTARGS="console=ttyS0,115200 panic=20 root=/dev/mtdblock3 rootfstype=squashfs init=/init"
 BOOTARGS="$BOOTARGS mtdparts=$MTDPARTS"
@@ -213,10 +301,15 @@ fi
 # included. That is the whole reason a full sysupgrade is only meaningful once
 # the bootloader inside it is one we build.
 #
-# It stops at the end of the rootfs rather than padding out to the full 16MB.
+# It stops at the end of the rootfs rather than padding out to the full chip.
 # sysupgrade erases the partition before writing, so the overlay area is
-# already 0xFF and /init formats it on first boot; carrying 8MB of padding
-# would only make every download bigger.
+# already 0xFF and /init formats it on first boot; carrying megabytes of
+# padding would only make every download bigger.
+#
+# That truncation is also why this image is safe to write with an external
+# programmer: everything it contains is a partition whose content this build
+# owns, and the bytes it stops short of are exactly the ones that would be
+# erased anyway.
 #
 # The image is identified by its first bytes, and a SigmaStar boot container
 # does not begin with a magic number -- see image_starts_with_bootloader in

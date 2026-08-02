@@ -36,7 +36,7 @@
 # the variable empty, re-probes, and writes it back. Declaring the sensor
 # statically would trade a self-healing path for one that needs the environment
 # restored by hand.
-# FRAG: soc-infinity6e core-sigmastar ssl-mbedtls
+# FRAG: soc-sigmastar core-sigmastar ssl-mbedtls
 
 # board.mk includes this file as a makefile before thingino.mk runs, so these
 # two are read as plain make variables there and drive SOC_VENDOR/FAMILY/ARCH.
@@ -106,13 +106,13 @@ BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
 # `fw_printenv rootmtd` is not authoritative for anything. Read the image size,
 # or /proc/cmdline after a boot.
 #
-# ssc30kq-post-image.sh mirrors that arithmetic instead of hardcoding a limit,
+# board/sigmastar/post-image.sh mirrors that arithmetic instead of hardcoding a limit,
 # and carries the note about retiring the whole mechanism when we build our own
 # U-Boot.
 #
 # panic=20 is a useful safety net during bring-up: a failed boot reboots after
 # 20s rather than hanging, so vendor U-Boot is always reachable again.
-BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/infinity6e/ssc30kq-post-image.sh"
+BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/post-image.sh"
 
 # The device type has to be stated. BR2_THINGINO_DEV_CAMERA is a hidden helper
 # (Config.soc.in:925) that gates the entire camera stack -- the streamer

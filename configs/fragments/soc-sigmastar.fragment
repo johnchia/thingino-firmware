@@ -1,0 +1,17 @@
+# Vendor-scoped rather than per-family, because nothing in here varies by
+# family: Infinity6, 6B0, 6C and 6E are all Cortex-A7 with the same FPU and
+# instruction set. The family reaches the build through the camera defconfig's
+# BR2_SIGMASTAR_SOC_FAMILY, which selects the kernel tree, the kernel config
+# and the U-Boot defconfig -- none of them from here.
+#
+# Split this per family if one ever arrives with a different core. Duplicating
+# it now would mean four identical files that have to be kept identical.
+BR2_arm=y
+BR2_cortex_a7=y
+BR2_ARM_FPU_NEON_VFPV4=y
+BR2_ARM_INSTRUCTIONS_THUMB2=y
+
+# Suppresses the Ingenic-only selects in Config.in (ingenic-sdk, ingenic-pwm,
+# ingenic-diag-tools, ingenic-musl, BR2_TARGET_UBOOT) without disabling
+# BR2_THINGINO_SYSTEM_PACKAGES, which also gates the application layer.
+BR2_SOC_SIGMASTAR=y

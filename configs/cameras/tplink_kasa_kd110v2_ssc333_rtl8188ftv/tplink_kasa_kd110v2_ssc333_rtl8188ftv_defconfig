@@ -1,0 +1,254 @@
+# NAME: TP-Link Kasa KD110 v2 (SSC333, Infinity6B0, USB Wi-Fi)
+#
+# The second SigmaStar board in this tree. Its purpose is to prove the
+# SigmaStar layer generalizes past the family it was written against: boot,
+# network, SSH, nothing else.
+#
+# Named per thingino's <brand>_[model_]<soc>_<sensor>[_<wifi>] convention,
+# following the tplink_tapo_* targets in putting the sub-brand in the model
+# field -- kasa_kd110v2 as tapo_c500. That yields hostname ing-tplink-kasa,
+# built from the first two underscore fields by scripts/rootfs_script.sh, in
+# the same way tplink_tapo_* yields ing-tplink-tapo.
+#
+# The sensor field is omitted, which the convention allows but this board has
+# outgrown: it now narrows its tuning blob to sc3336 and streams from it. The
+# field stays empty because the directory name is the target's identity --
+# CAMERA=, the image filename, what a user types to rebuild -- and renaming it
+# is a change to make on its own, not folded into a functional one.
+#
+# The wifi field carries rtl8188ftv, the marking on the module fitted to this
+# board; the driver package is wifi-rtl8188fu (FU is the USB interface, FTV the
+# part) and thingino uses both spellings the same way -- cf.
+# wanjiaan_hdc51_t31l_sc2332_rtl8188ftv.
+#
+# Verified on hardware: boots to a serial login, Wi-Fi comes up without any
+# GPIO poking, and the captive portal is reachable.
+#
+# WHAT IS DELIBERATELY NOT HERE: no audio and no WebRTC. The streamer arrived
+# once raptor gained an INFINITY6B0 platform; these two are held back by the 8MB
+# part rather than by anything unresolved, and the shipped raptor config
+# disables both to match.
+#
+# ONVIF is here whether or not this file asks for it: Config.in:83 selects it
+# for any DEV_IPCAM board with a streamer, and a Kconfig select cannot be
+# declined by a defconfig. Left alone rather than guarded -- it is wanted
+# eventually, and narrowing a shared select for one board's flash budget is a
+# change to make deliberately if the overlay ever runs out.
+# FRAG: soc-sigmastar core-sigmastar ssl-mbedtls
+
+# board.mk includes this file as a makefile before thingino.mk runs, so these
+# two are read as plain make variables there and drive SOC_VENDOR/FAMILY/ARCH.
+# They are not Kconfig symbols; olddefconfig drops them from .config.
+#
+# SOC_FAMILY is the load-bearing one. It alone selects the kernel tarball
+# (openipc/linux archive/sigmastar-infinity6b0), the kernel config
+# (board/sigmastar/infinity6b0/linux.config), and the U-Boot defconfig and IPL
+# blob directory (infinity6b0_defconfig, ipl/infinity6b0/). All three are keyed
+# on it in shared files, so this target adds no vendor plumbing of its own.
+#
+# SSC333 is Infinity6B0, NOT Infinity6E. The two are close -- same Cortex-A7,
+# same 4.9 kernel line, same EMAC, EHCI and GPIO drivers, kernel configs that
+# differ in 152 lines -- but they are separate families with separate kernel
+# trees and separate toolchains, and treating one as the other silently builds
+# against the wrong vendor headers.
+BR2_SIGMASTAR_SOC_MODEL="ssc333"
+BR2_SIGMASTAR_SOC_FAMILY="infinity6b0"
+
+# 8MB NOR, confirmed on the target board. OpenIPC ships ssc333 defconfigs for
+# both 8 and 16MB, so this is a per-unit fact rather than a property of the
+# SoC; board/sigmastar/post-image.sh sizes every partition from it.
+FLASH_SIZE_MB=8
+
+# THE TOOLCHAIN IS PER-FAMILY, AND THIS FAMILY IS MUSL.
+#
+# OpenIPC publishes one toolchain per SoC family and they do not share a libc:
+# toolchain.sigmastar-infinity6e is glibc (arm-openipc-linux-gnueabihf), and
+# toolchain.sigmastar-infinity6b0 is musl (arm-openipc-linux-musleabihf). Both
+# ssc333 defconfigs upstream use the musl one, so that is the combination with
+# field mileage on this silicon.
+#
+# core-sigmastar.fragment declares GLIBC for the Infinity6E board. Overriding
+# it here works because scripts/resolve_toolchain_value.sh walks the fragment
+# stack and the camera defconfig in order and takes the LAST match, and
+# Makefile:172 puts this file after the fragments. That resolution happens
+# before Buildroot runs, so it picks the toolchain fragment file too.
+#
+# If musl turns out to fight the application layer -- this is the first time
+# thingino's userspace is built for ARM against musl -- the fallback is the
+# Infinity6E glibc toolchain, which is the same GCC for the same architecture
+# and cares nothing for the SoC family in its name. That is a fallback and not
+# the default, because it would be a combination nobody has shipped.
+BR2_THINGINO_TOOLCHAIN_LIBC_MUSL=y
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM=y
+BR2_TOOLCHAIN_EXTERNAL_DOWNLOAD=y
+BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/openipc/firmware/releases/download/toolchain/toolchain.sigmastar-infinity6b0.tgz"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX="arm-openipc-linux-musleabihf"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_MUSL=y
+BR2_TOOLCHAIN_EXTERNAL_GCC_13=y
+BR2_TOOLCHAIN_EXTERNAL_CXX=y
+
+# Makefile:580-588 appends 3.10 or 4.4 headers unconditionally from the Ingenic
+# KERNEL_VERSION and runs before this file is appended. The OpenIPC ARM
+# toolchains ship 4.9 headers.
+BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
+
+BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/post-image.sh"
+
+# BR2_THINGINO_DEV_CAMERA is a hidden helper (Config.soc.in:925) set only by
+# DEV_IPCAM or DEV_WEBCAM, and it gates the camera stack. This target was SBC
+# for as long as it drove no streamer, on the grounds that describing the board
+# honestly was what kept the image small.
+#
+# It is a camera now, and the ISP/IMP half of what DEV_CAMERA gates is Ingenic:
+# ingenic-lib is selected on !BR2_SOC_SIGMASTAR, ingenic-sdk is not selected at
+# all here, and rmem feeds a module this vendor never loads -- the SigmaStar
+# carveout comes from LX_MEM/mma_heap in the bootargs instead. So what this
+# actually adds to an ARM rootfs is the sensor utilities in thingino-system.
+BR2_THINGINO_DEV_IPCAM=y
+
+# The streamer. Held back until raptor had an INFINITY6B0 platform to build
+# against: thingino derives PLATFORM from SOC_FAMILY, so this board passed
+# PLATFORM=INFINITY6B0 into a Makefile whose VALID_PLATFORMS stopped at
+# INFINITY6E, and selecting raptor failed the build rather than degrading.
+BR2_PACKAGE_THINGINO_STREAMER_RAPTOR=y
+
+# THE STREAM GEOMETRY COMES FROM THE RAPTOR REPO, NOT FROM KNOBS BELOW.
+#
+# The Infinity6E target does the opposite -- it sets geometry through this
+# file's Kconfig knobs and leaves the repo's config unused -- and that is right
+# there, where the numbers are free choices. Here they are not: the main stream
+# is 1080p because the multimedia pool was cut to 24MB to give userspace room
+# for a web UI, and 1080p is what fits the 21.6MB that costs. The arithmetic
+# tying those two numbers together is in the config's own header, and splitting
+# them across two repositories is how they drift apart.
+#
+# So the pool size and this file must move together. See the mma_heap patch in
+# package/sigmastar-uboot/ for the other half.
+#
+# Safe to install wholesale because this config confines itself to geometry:
+# it carries no [ircut] section, so the GPIO map in this camera's thingino.json
+# stays authoritative, and no [osd] section either.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_BASE="config/raptor-ssc333.conf"
+
+# Daemon selection, matched to what that config enables. NOT the FULL set: on
+# an 8MB part a daemon that nothing is configured to use is overlay space spent
+# on nothing.
+#
+# rad is out because [audio] is disabled -- this board's microphone has not
+# been brought up. rwd is out because [webrtc] is disabled. rac follows rad by
+# default, so it is stated rather than assumed.
+#
+# rhd is in for the snapshot channel: [jpeg] is enabled and the sub stream
+# clones a VPE port for it, which is 0.66MB of pool that only pays for itself
+# if something serves the result.
+# BR2_PACKAGE_THINGINO_RAPTOR_FULL is not set
+BR2_PACKAGE_THINGINO_RAPTOR_RVD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RSD=y
+BR2_PACKAGE_THINGINO_RAPTOR_ROD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RIC=y
+BR2_PACKAGE_THINGINO_RAPTOR_RHD=y
+# BR2_PACKAGE_THINGINO_RAPTOR_RAD is not set
+# BR2_PACKAGE_THINGINO_RAPTOR_RAC is not set
+
+# The audio codecs are default y and depend on nothing -- not on rad, not on
+# [audio] being enabled -- so dropping rad leaves them shipping anyway. They
+# are 241KB compressed, which on this part is a fifth of the overlay for code
+# no daemon can reach. Turn them back on with rad, not before.
+# BR2_PACKAGE_THINGINO_RAPTOR_AAC is not set
+# BR2_PACKAGE_THINGINO_RAPTOR_OPUS is not set
+
+# THESE THREE RESTATE WHAT THE BASE CONFIG ALREADY SAYS, AND HAVE TO.
+#
+# Most of the Kconfig settings above default to empty, which the patcher reads
+# as "leave the file alone". These three do not -- they default to 4, true and
+# debug -- so they are written over whatever the base config had, and the base
+# config is the only place their values were reasoned about. Silently reverting
+# refmode is the expensive one: the ring regions are pinned in that file so the
+# /dev/shm allocation cannot grow behind a later bitrate change.
+#
+# A setting that appears here and in the base config is not redundant. Check
+# the installed /etc/raptor.conf against the repo file after changing either.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_RING_REFMODE_FALSE=y
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_RTSP_MAX_CLIENTS="2"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_LOG_LEVEL="info"
+
+# The bootloader. Not optional on this board, unlike the Infinity6E target
+# where it was built for months before it was flashed: the first hardware test
+# here writes the whole chip from an external programmer, so the boot container
+# and the environment in that image are the ones the board will run.
+BR2_PACKAGE_SIGMASTAR_UBOOT=y
+
+# Wi-Fi is the only network interface. BR2_PACKAGE_WIFI is the umbrella --
+# wpa_supplicant with NL80211, wireless-tools, thingino-kopt -- and the FU
+# package is the driver. Its Ingenic USB-controller selects are guarded on
+# !BR2_SOC_SIGMASTAR; see package/wifi-rtl8188fu/Config.in.
+BR2_PACKAGE_WIFI=y
+BR2_PACKAGE_WIFI_RTL8188FU=y
+
+BR2_PACKAGE_DROPBEAR=y
+
+# SLOW FIRST BOOT -- FIXED IN THE KERNEL CONFIG, see CONFIG_SS_RNG in
+# board/sigmastar/infinity6b0/linux.config.
+#
+# The symptom was a board that looked hung partway through init. With no
+# ethernet, no disk and wlan0 not up yet, the only entropy was interrupt
+# timing, and S02ssl blocks in mbedTLS's getrandom() generating the uhttpd
+# certificate -- init waiting at position 02 for a CRNG only later stages of
+# the same sequence could seed. Typing on a serial console got past it, which
+# is exactly why it went unnoticed on a bench unit and bit a headless one.
+#
+# The SoC has a hardware TRNG in the RSA/crypto block all along. An earlier
+# reading of this tree concluded otherwise -- that sstar-rng.c was a platform
+# driver bound by a device-tree compatible nothing declares. The commented-out
+# platform_driver in that file is dead by design: mdrv_aes.c calls
+# sstar_rng_probe() directly from the AES driver's probe under CONFIG_SS_RNG,
+# and MS_CRYPTO was already enabled. Only the Kconfig symbol was missing.
+#
+# Nothing is needed here as a result -- no entropy daemon, no init reordering.
+# The hwrng core's own kthread seeds the pool before userspace starts.
+
+# ipcinfo, and the i2c sensor probe behind it.
+BR2_PACKAGE_IPCTOOL=y
+
+# The vendor MI bundle: mi_* kernel modules, MI userspace libraries, ISP
+# firmware and the per-sensor tuning blobs. S20sigmastar (shipped by the
+# package) inserts the modules; without them mi_sensor does not exist and the
+# i2c probe has nothing to talk to.
+#
+# raptor's HAL dlopens these by soname, so nothing links against them and the
+# linker will never complain if they are missing -- the daemons would build,
+# install, start, and fail at the first HAL call. Named here as well as in
+# thingino-raptor's dependency list because a reader looking for what puts
+# /dev/mi_* on this image should find it in the board's own config.
+BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6B0=y
+
+# ONE SENSOR, AND THIS MAKES THE IMAGE BOARD-SPECIFIC RATHER THAN SoC-SPECIFIC.
+#
+# The Infinity6E target ships all of its sensor blobs and autodetects, which is
+# the right default: load_sigmastar probes i2c and binds whatever it finds, so
+# a blob that is not installed is a board this image cannot drive. That target
+# is on 16MB and the full set costs it nothing worth counting.
+#
+# This part is 8MB and cannot hold the vendor bundle, a kernel and a rootfs at
+# full width. The full set of 15 blobs is ~1.5MB raw. Narrowing to the sensor
+# this board is fitted with is the deliberate trade, and it is stated here
+# rather than hidden in the package so the cost is visible where the decision
+# was made.
+#
+# Note this narrows ISP *tuning* only. All 18 sensor_*_mipi.ko modules still
+# ship -- they are 236KB raw between them, and dropping the 17 unused ones
+# would save 42KB compressed, which is not worth giving up detection for. So a
+# board with a different sensor still probes and binds; it just runs on ISP
+# defaults instead of a tuned profile. Degraded, not dead.
+#
+# Widen this the moment the space exists, or if this image is ever pointed at
+# another SSC333 board.
+BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6B0_SENSORS="sc3336"
+
+# The OpenIPC toolchain sysroot ships a libz that -lz resolves against at link
+# time, but Buildroot's toolchain-external only copies a fixed set of runtime
+# libraries into the target, so libz.so.1 would be missing at runtime and
+# anything reaching it through libcurl would fail to start. Building a real
+# target zlib gives the library one owner. Same reasoning as the Infinity6E
+# target, where curl and telegrambot both broke on it.
+BR2_PACKAGE_ZLIB=y
