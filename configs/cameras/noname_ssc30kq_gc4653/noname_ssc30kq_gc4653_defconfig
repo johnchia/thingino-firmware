@@ -51,9 +51,14 @@ FLASH_SIZE_MB=16
 # (Makefile:185) and has no architecture in it, so the file that gets appended
 # is always thingino's mipsel toolchain. Re-point it here: the camera defconfig
 # is appended after the fragments (Makefile:591), so these win.
+#
+# The asset follows the naming the ext-*.fragment URLs already use -- the
+# release tag names the build host, the filename names the target. It is the
+# OpenIPC toolchain with the bundled userspace stripped from its sysroot, so
+# nothing here needs package/sigmastar-toolchain-prune.
 BR2_TOOLCHAIN_EXTERNAL_CUSTOM=y
 BR2_TOOLCHAIN_EXTERNAL_DOWNLOAD=y
-BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/openipc/firmware/releases/download/toolchain/toolchain.sigmastar-infinity6e.tgz"
+BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/johnchia/thingino-firmware/releases/download/toolchain-x86_64/thingino-toolchain-x86_64_infinity6e_glibc_gcc13-linux-arm.tar.gz"
 BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX="arm-openipc-linux-gnueabihf"
 BR2_TOOLCHAIN_EXTERNAL_CUSTOM_GLIBC=y
 BR2_TOOLCHAIN_EXTERNAL_GCC_13=y
