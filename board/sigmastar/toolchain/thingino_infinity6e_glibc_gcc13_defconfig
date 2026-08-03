@@ -1,0 +1,36 @@
+# Toolchain producer for SigmaStar Infinity6E (ARMv7 cortex-a7, hard float).
+#
+# This is a BUILDROOT defconfig, not a thingino camera defconfig, and it is
+# built against Buildroot 2024.02.10 rather than the submodule. See README.md
+# in this directory for why and how.
+BR2_arm=y
+BR2_cortex_a7=y
+BR2_ARM_EABIHF=y
+BR2_ARM_FPU_NEON_VFPV4=y
+BR2_ARM_INSTRUCTIONS_THUMB2=y
+
+BR2_OPTIMIZE_S=y
+
+BR2_TOOLCHAIN_BUILDROOT_VENDOR="thingino"
+BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
+
+# 4.9.84, matching the kernel the board runs.
+#
+# All three lines are required. The "Kernel Headers" choice offers nothing
+# older than 4.19, so 4.9 is only reachable through the manually-specified
+# path: BR2_KERNEL_HEADERS_VERSION opens it, BR2_DEFAULT_KERNEL_VERSION gives
+# the version, and CUSTOM_4_9 tells Buildroot which series that is. Setting
+# CUSTOM_4_9 alone is silently ignored and the default 6.6 headers win, which
+# the toolchain build does not complain about -- it surfaces much later as
+# "Incorrect selection of kernel headers: expected 4.9.x, got 6.6.x" when a
+# camera tries to consume the result.
+BR2_KERNEL_HEADERS_VERSION=y
+BR2_DEFAULT_KERNEL_VERSION="4.9.84"
+BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_4_9=y
+
+BR2_BINUTILS_VERSION_2_40_X=y
+BR2_GCC_VERSION_13_X=y
+BR2_TOOLCHAIN_BUILDROOT_CXX=y
+
+BR2_CCACHE=y
+BR2_CCACHE_USE_BASEDIR=y

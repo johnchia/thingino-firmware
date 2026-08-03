@@ -25,7 +25,11 @@ sensor_name() {
 }
 
 raptor_get() {
-	raptorctl config get "$1" "$2" 2>/dev/null | tr -d '\r\n"'
+	v=$(raptorctl config get "$1" "$2" 2>/dev/null | tr -d '\r\n"')
+	# An unset key in [sensor] reads back as 0, not as empty. Report it as no
+	# value, or the stream0 fallback below never runs.
+	[ "$v" = "0" ] && return
+	printf '%s' "$v"
 }
 
 param="${1:-all}"
