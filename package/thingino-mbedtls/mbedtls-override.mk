@@ -134,6 +134,12 @@ override MBEDTLS_CONF_OPTS += -DENABLE_PROGRAMS=OFF -DENABLE_TESTING=OFF
 # Use the proper Buildroot/mbedTLS CMake variables instead of generic BUILD_SHARED_LIBS
 override MBEDTLS_CONF_OPTS += -DUSE_SHARED_MBEDTLS_LIBRARY=ON -DUSE_STATIC_MBEDTLS_LIBRARY=OFF
 
+# Restored, not added: the override flag above discards package/mbedtls's own
+# "MBEDTLS_CONF_OPTS = ..." assignment, and this was in it. mbedtls defaults it
+# to ON, which is -Werror -- gcc15 then fails aes.c on a -Warray-bounds false
+# positive in mbedtls_xor_no_simd.
+override MBEDTLS_CONF_OPTS += -DMBEDTLS_FATAL_WARNINGS=OFF
+
 # Add the HTTP/2 configuration hook to mbedtls
 MBEDTLS_PRE_CONFIGURE_HOOKS += MBEDTLS_ENABLE_HTTP2_FEATURES
 
