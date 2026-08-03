@@ -68,14 +68,13 @@ menuconfig BR2_THINGINO_SYSTEM_PACKAGES
 	bool "System Packages"
 	default y if !BR2_THINGINO_TOOLCHAIN
 	select BR2_PACKAGE_DROPBEAR
-	# The Ingenic-only selects below are guarded on !BR2_SOC_SIGMASTAR rather
-	# than moved, because this menu also gates the Config.in sources for the
-	# whole application layer further down. The guard is a no-op for Ingenic
-	# builds, where BR2_SOC_SIGMASTAR is n.
-	select BR2_PACKAGE_INGENIC_DIAG_TOOLS if !BR2_SOC_SIGMASTAR
-	select BR2_PACKAGE_INGENIC_LIB if (BR2_THINGINO_DEV_CAMERA || BR2_THINGINO_AUDIO) && !BR2_SOC_SIGMASTAR
-	select BR2_PACKAGE_INGENIC_PWM if !BR2_SOC_SIGMASTAR
-	select BR2_PACKAGE_INGENIC_SDK if !KERNEL_VERSION_7 && !BR2_SOC_SIGMASTAR
+	# Guarded rather than moved: this menu also gates the Config.in sources for
+	# the whole application layer further down. BR2_SOC_VENDOR_INGENIC is y on
+	# every Ingenic build, so these selects are unchanged there.
+	select BR2_PACKAGE_INGENIC_DIAG_TOOLS if BR2_SOC_VENDOR_INGENIC
+	select BR2_PACKAGE_INGENIC_LIB if (BR2_THINGINO_DEV_CAMERA || BR2_THINGINO_AUDIO) && BR2_SOC_VENDOR_INGENIC
+	select BR2_PACKAGE_INGENIC_PWM if BR2_SOC_VENDOR_INGENIC
+	select BR2_PACKAGE_INGENIC_SDK if !KERNEL_VERSION_7 && BR2_SOC_VENDOR_INGENIC
 	select BR2_PACKAGE_THINGINO_CORE
 	select BR2_PACKAGE_THINGINO_JCT
 	select BR2_PACKAGE_THINGINO_KOPT
@@ -84,7 +83,7 @@ menuconfig BR2_THINGINO_SYSTEM_PACKAGES
 	# SigmaStar keeps the vendor bootloader on the chip; nothing builds or
 	# flashes U-Boot there, and the SoC database has no U-Boot board name for
 	# it, so an unguarded select resolves to "unsupported-<model>".
-	select BR2_TARGET_UBOOT if !BR2_SOC_SIGMASTAR
+	select BR2_TARGET_UBOOT if BR2_SOC_VENDOR_INGENIC
 	select BR2_PACKAGE_THINGINO_WEBUI
 	select BR2_PACKAGE_UBOOT_TOOLS
 	# buildroot package configuration
@@ -92,7 +91,7 @@ menuconfig BR2_THINGINO_SYSTEM_PACKAGES
 	select BR2_PACKAGE_DROPBEAR_DISABLE_REVERSEDNS if BR2_PACKAGE_DROPBEAR
 	select BR2_PACKAGE_WPA_SUPPLICANT_DEBUG_SYSLOG if BR2_PACKAGE_WPA_SUPPLICANT
 	# abstractions
-	select BR2_PACKAGE_INGENIC_MUSL if BR2_TOOLCHAIN_USES_MUSL && !BR2_SOC_SIGMASTAR
+	select BR2_PACKAGE_INGENIC_MUSL if BR2_TOOLCHAIN_USES_MUSL && BR2_SOC_VENDOR_INGENIC
 	select BR2_PACKAGE_THINGINO_ETHERNET if BR2_ETHERNET
 	select BR2_PACKAGE_THINGINO_MOTORS if BR2_THINGINO_MOTORS
 	select BR2_PACKAGE_THINGINO_SOUNDS if BR2_THINGINO_AUDIO
@@ -172,8 +171,8 @@ source "$BR2_EXTERNAL_THINGINO_PATH/package/thingino-webui/Config.in"
 # interleaved alphabetically on purpose: upstream adds its own source lines in
 # alphabetical order, so an entry inserted mid-list is sitting exactly where
 # the next upstream package wants to go. Every symbol below is gated on
-# BR2_SOC_SIGMASTAR, so an Ingenic build sees four more invisible options and
-# nothing else changes.
+# BR2_SOC_VENDOR_SIGMASTAR, so an Ingenic build sees four more invisible
+# options and nothing else changes.
 source "$BR2_EXTERNAL_THINGINO_PATH/package/ipctool/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-osdrv-infinity6e/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-osdrv-sensors/Config.in"

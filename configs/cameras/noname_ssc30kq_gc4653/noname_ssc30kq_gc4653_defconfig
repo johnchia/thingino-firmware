@@ -113,9 +113,8 @@ BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/infi
 # back to None with nothing in the build log to say why.
 BR2_THINGINO_DEV_IPCAM=y
 
-# Phase 2: the camera stack. thingino-raptor's Ingenic hard-selects are guarded
-# on !BR2_SOC_SIGMASTAR now, so selecting Raptor here no longer drags MIPS
-# vendor blobs into an ARM rootfs.
+# thingino-raptor's Ingenic hard-selects are guarded on BR2_SOC_VENDOR_INGENIC,
+# so selecting Raptor here does not drag MIPS vendor blobs into an ARM rootfs.
 BR2_PACKAGE_THINGINO_STREAMER_RAPTOR=y
 
 # The vendor MI bundle. Also select-ed by thingino-raptor, but named here too:

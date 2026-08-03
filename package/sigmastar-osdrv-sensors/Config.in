@@ -1,6 +1,6 @@
 config BR2_PACKAGE_SIGMASTAR_OSDRV_SENSORS
 	bool "sigmastar-osdrv-sensors"
-	depends on BR2_SOC_SIGMASTAR
+	depends on BR2_SOC_VENDOR_SIGMASTAR
 	depends on BR2_LINUX_KERNEL
 	help
 	  SigmaStar sensor driver kernel modules, built from source for the
