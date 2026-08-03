@@ -5,7 +5,14 @@ qstrip ?= $(strip $(subst ",,$(1)))
 # SOC
 #
 
+# The else branch is a fallback, not just the Kconfig default: this file is
+# parsed before .config exists on some paths, and every existing defconfig sets
+# no vendor symbol at all.
+ifeq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
+SOC_VENDOR := sigmastar
+else
 SOC_VENDOR := ingenic
+endif
 
 # SigmaStar (Infinity6E) runs alongside the Ingenic path rather than replacing
 # it. BR2_SIGMASTAR_SOC_MODEL comes from the camera defconfig, which board.mk
