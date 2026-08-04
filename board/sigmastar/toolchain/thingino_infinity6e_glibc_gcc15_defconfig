@@ -1,11 +1,11 @@
 # Toolchain producer for SigmaStar Infinity6E (ARMv7 cortex-a7, hard float).
 #
-# This is a BUILDROOT defconfig, not a thingino camera defconfig. Unlike the
-# gcc13 producer beside it, this one builds against the pinned submodule: that
-# is where gcc 15.3.0 and binutils 2.44 come from, and they are the exact
-# versions configs/github/toolchain_*_gcc15_defconfig selects for every Ingenic
-# toolchain. Matching them is the point -- a gcc15 ARM toolchain can be
-# produced by upstream's own workflow, where a gcc13 one cannot.
+# This is a BUILDROOT defconfig, not a thingino camera defconfig. It builds
+# against the pinned submodule: that is where gcc 15.3.0 and binutils 2.44 come
+# from, and they are the exact versions
+# configs/github/toolchain_*_gcc15_defconfig selects for every Ingenic
+# toolchain. Matching them is what lets this producer run in upstream's own
+# toolchain workflow.
 BR2_arm=y
 BR2_cortex_a7=y
 BR2_ARM_EABIHF=y

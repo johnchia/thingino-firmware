@@ -9,12 +9,12 @@ form on ARM:
     unrecognized character is `#'
 
 The standard ELF spelling ("a" / "ax") is accepted by every binutils in
-play, including the 2.40 the current toolchain ships, so this is safe to
-carry ahead of any toolchain change.
+play, so this is safe across toolchain changes.
 
-Without it the vendor 4.9 tree cannot be built by any toolchain newer than
-binutils 2.40, which is what pins this port to a GCC 13 external toolchain.
-With it, the tree builds clean under GCC 14.2 + binutils 2.42.
+Without it the vendor 4.9 tree cannot be built by any binutils newer than
+2.40. The toolchain this port ships is binutils 2.44, so the patch is
+required rather than forward-looking: it is what makes the tree buildable
+at all, not an accommodation for a future bump.
 
 --- a/arch/arm/boot/bootp/init.S
 +++ b/arch/arm/boot/bootp/init.S
