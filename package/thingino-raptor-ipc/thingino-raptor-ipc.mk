@@ -23,7 +23,7 @@ endef
 # See the matching block in thingino-raptor.mk. Architecture-neutral like
 # raptor-common; pinned to the fork only to keep the four repositories on one
 # branch.
-ifeq ($(BR2_SOC_SIGMASTAR),y)
+ifeq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
 THINGINO_RAPTOR_IPC_VERSION = 63607ccedbe5837b325016c665aaf85acaba468e
 THINGINO_RAPTOR_IPC_SITE = https://github.com/johnchia/raptor-ipc
 endif

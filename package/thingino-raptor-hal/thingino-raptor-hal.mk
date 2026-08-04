@@ -10,7 +10,7 @@ THINGINO_RAPTOR_HAL_INSTALL_TARGET = NO
 # plus their dlopen thunks live in src/star/ inside the tree. The
 # INGENIC_HEADERS argument below is inert there for the same reason, so it is
 # left alone rather than made conditional.
-ifneq ($(BR2_SOC_SIGMASTAR),y)
+ifneq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
 THINGINO_RAPTOR_HAL_DEPENDENCIES = ingenic-lib
 endif
 
@@ -39,7 +39,7 @@ endef
 
 # See the matching block in thingino-raptor.mk for why the SigmaStar source
 # override lives at the bottom of the file rather than beside the pinned hash.
-ifeq ($(BR2_SOC_SIGMASTAR),y)
+ifeq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
 THINGINO_RAPTOR_HAL_VERSION = 7f1893e3e07a31a52ab3b022c22d46f8a710349f
 THINGINO_RAPTOR_HAL_SITE = https://github.com/johnchia/raptor-hal
 endif

@@ -1,8 +1,25 @@
 menu "Core Device Configuration"
 
 menu "SOC Configuration"
+
+choice
+	prompt "SoC vendor"
+	default BR2_SOC_VENDOR_INGENIC
+	help
+	  Silicon vendor of this camera's SoC. Selects which board support
+	  layer applies and which SoC model space is offered below.
+
+config BR2_SOC_VENDOR_INGENIC
+	bool "Ingenic"
+
+config BR2_SOC_VENDOR_SIGMASTAR
+	bool "SigmaStar"
+
+endchoice
+
 config BR2_INGENIC_SOC_MODEL
 	string "SoC Model"
+	depends on BR2_SOC_VENDOR_INGENIC
 	default ""
 	help
 	  Enter the Ingenic SoC model name for your device (e.g., t31x, t40n, t41nq).
@@ -36,24 +53,6 @@ config BR2_SOC_FAMILY
 config BR2_SOC_RAM_MB
 	int "RAM size in MB"
 	default 64
-
-config BR2_SOC_SIGMASTAR
-	bool "SoC is SigmaStar"
-	help
-	  Set by the SigmaStar SoC fragments. Defaults to n, so every Ingenic
-	  build behaves exactly as it did before this symbol existed.
-
-	  This is deliberately a "not Ingenic" marker rather than a full vendor
-	  choice. Config.in hard-selects Ingenic packages (ingenic-sdk,
-	  ingenic-pwm, ingenic-diag-tools) and BR2_TARGET_UBOOT from
-	  BR2_THINGINO_SYSTEM_PACKAGES, which also gates the Config.in sources
-	  for the whole application layer -- thingino-core, -jct, -system,
-	  -webui. Turning that menu off to escape the Ingenic selects would
-	  take the application layer with it, so the selects are guarded on
-	  this symbol instead.
-
-	  Note BR2_SOC_INGENIC, which soc-xburst1/2.fragment set, is not a
-	  declared symbol anywhere in the tree and so cannot be tested here.
 
 endmenu
 

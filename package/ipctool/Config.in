@@ -1,6 +1,6 @@
 config BR2_PACKAGE_IPCTOOL
 	bool "ipctool"
-	depends on BR2_SOC_SIGMASTAR
+	depends on BR2_SOC_VENDOR_SIGMASTAR
 	help
 	  OpenIPC's IP-camera hardware identification tool. Installs
 	  `ipcinfo`, which reports the SoC, the flash chip and -- the reason

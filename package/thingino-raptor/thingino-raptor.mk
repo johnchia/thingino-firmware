@@ -1,4 +1,4 @@
-THINGINO_RAPTOR_VERSION = 07a772a485af795706fd31cd282a07f04cbd6ea9
+THINGINO_RAPTOR_VERSION = c6d6dd3978ab6744e3e22d055d56f0b12dd04e46
 THINGINO_RAPTOR_SITE = https://github.com/gtxaspec/raptor
 THINGINO_RAPTOR_SITE_METHOD = git
 
@@ -16,7 +16,7 @@ THINGINO_RAPTOR_DEPENDENCIES += thingino-raptor-hal thingino-raptor-ipc thingino
 # but it is still declared: dlopen at runtime means the linker will never
 # complain, so build order is the only place this can be stated. Without it a
 # parallel build can install the daemons before the MI libraries exist.
-ifeq ($(BR2_SOC_SIGMASTAR),y)
+ifeq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
 THINGINO_RAPTOR_DEPENDENCIES += sigmastar-osdrv-infinity6e
 else
 THINGINO_RAPTOR_DEPENDENCIES += ingenic-lib
@@ -225,8 +225,8 @@ endef
 # turns every one of those bumps into a merge conflict, and a block down here
 # does not. Buildroot reads _VERSION and _SITE when generic-package is
 # evaluated, which is the line below, so this is still in time.
-ifeq ($(BR2_SOC_SIGMASTAR),y)
-THINGINO_RAPTOR_VERSION = 3dd817977ec4f60ef6af35646d5c7e7ca44f3d8e
+ifeq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
+THINGINO_RAPTOR_VERSION = f1098dd8d87b06430424824da8841808d654bd20
 THINGINO_RAPTOR_SITE = https://github.com/johnchia/raptor
 endif
 
