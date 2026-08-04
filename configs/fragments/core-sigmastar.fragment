@@ -1,15 +1,13 @@
 # SigmaStar counterpart to core.fragment.
 #
-# This is a separate file rather than a set of overrides on top of core.fragment
-# because core.fragment is not vendor-neutral: it hardcodes
-# board/ingenic/$(SOC_ARCH)/... for the kernel config, selects BR2_TARGET_UBOOT
-# with an Ingenic JZ SFC flash controller, and strips Ingenic vendor libraries.
-# Overriding those from a later fragment would leave the Ingenic values in
-# .config for olddefconfig to trip over, and editing core.fragment in place is
-# exactly the kind of shared-file change that makes upstream merges expensive.
+# One core fragment per vendor rather than overrides layered on core.fragment:
+# that file hardcodes board/ingenic/$(SOC_ARCH)/... for the kernel config,
+# selects BR2_TARGET_UBOOT with an Ingenic JZ SFC flash controller, and strips
+# Ingenic vendor libraries. Overriding those from a later fragment would leave
+# the Ingenic values in .config for olddefconfig to trip over.
 #
-# Everything here that is NOT vendor-specific is deliberately kept identical to
-# core.fragment so the two can be diffed after an upstream merge.
+# Everything not vendor-specific is kept identical to core.fragment, so the two
+# can be diffed to see exactly what the vendor changes.
 
 BR2_CCACHE=y
 BR2_CCACHE_USE_BASEDIR=y

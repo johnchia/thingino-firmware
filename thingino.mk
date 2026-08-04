@@ -95,10 +95,9 @@ ifeq ($(KERNEL_VERSION),)
 	endif
 endif
 
-# Guarded rather than reindented, so the Ingenic body below stays byte-for-byte
-# identical to upstream and merges cleanly. SigmaStar pulls its kernel as a
-# tarball (see core-sigmastar.fragment) and needs none of these; leaving the
-# block unguarded would also fire the git ls-remote below on every make.
+# SigmaStar pulls its kernel as a tarball (see core-sigmastar.fragment) and sets
+# none of KERNEL_SITE/BRANCH/HASH. Unguarded, the git ls-remote at the end of
+# this block would also run on every make for a vendor that never reads it.
 ifeq ($(SOC_VENDOR),ingenic)
 
 KERNEL_SITE := https://github.com/gtxaspec/thingino-linux
