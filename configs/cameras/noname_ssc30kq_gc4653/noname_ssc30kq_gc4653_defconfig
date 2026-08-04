@@ -24,12 +24,10 @@
 # fragments are appended to .config, never included as makefiles, so a symbol
 # set only in a fragment is invisible to thingino.mk's vendor dispatch.
 #
-# BR2_SIGMASTAR_SOC_MODEL and _SOC_FAMILY are not Kconfig symbols; olddefconfig
-# drops them from .config, the same way it drops FLASH_SIZE_MB in the Ingenic
-# camera configs.
+# The family is not set here: Config.soc.in derives BR2_SOC_FAMILY from the
+# model, and thingino.mk maps the same model for the make side.
 BR2_SOC_VENDOR_SIGMASTAR=y
 BR2_SIGMASTAR_SOC_MODEL="ssc30kq"
-BR2_SIGMASTAR_SOC_FAMILY="infinity6e"
 
 # Selects which IQ blob sigmastar-osdrv-infinity6e installs to
 # /usr/share/sensor. raptor still probes i2c at runtime and binds whichever of

@@ -18,11 +18,16 @@ endif
 # SOC_FAMILY, SOC_ARCH, SOC_RAM_MB -- and how it gets them is its own business.
 ifeq ($(SOC_VENDOR),sigmastar)
 
-# BR2_SIGMASTAR_* come from the camera defconfig, which board.mk includes as a
-# makefile before this file. They are not Kconfig symbols, so they are readable
-# here but not from any Config.in.
+# BR2_SIGMASTAR_SOC_MODEL comes from the camera defconfig, which board.mk
+# includes as a makefile before this file. Config.soc.in declares the same
+# symbol, so the one defconfig line feeds both this dispatch and Kconfig.
 SOC_MODEL := $(shell echo $(call qstrip,$(BR2_SIGMASTAR_SOC_MODEL)) | tr A-Z a-z)
-SOC_FAMILY := $(call qstrip,$(BR2_SIGMASTAR_SOC_FAMILY))
+# Mirrors BR2_SOC_FAMILY's default chain in Config.soc.in. Kconfig cannot be
+# queried from here, so the map is stated in both places -- as it already is for
+# Ingenic, where Config.soc.in restates soc_database.txt's family column.
+ifeq ($(SOC_MODEL),ssc30kq)
+SOC_FAMILY := infinity6e
+endif
 # SOC_ARCH selects a board/kernel subdirectory. For Ingenic that is an ISA
 # (xburst1/xburst2) shared by several families; here the family is the finest
 # split that exists, so the two coincide.

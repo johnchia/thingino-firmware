@@ -33,12 +33,10 @@ SIGMASTAR_UBOOT_INSTALL_IMAGES = YES
 SIGMASTAR_UBOOT_INSTALL_TARGET = NO
 SIGMASTAR_UBOOT_INSTALL_STAGING = NO
 
-# From thingino.mk's exported environment, not from .config. The camera
-# defconfig's BR2_SIGMASTAR_SOC_MODEL and _SOC_FAMILY are read by the outer
-# make and are declared in no Kconfig, so Kconfig drops them and they are empty
-# inside a package. Both are checked below because an empty one here builds a
-# target named "_defconfig" and fails several steps later with nothing naming
-# the cause.
+# From thingino.mk's exported environment, not from .config: the model reaches
+# Kconfig too, but the family is derived there and never written back. Both are
+# checked below because an empty one here builds a target named "_defconfig" and
+# fails several steps later with nothing naming the cause.
 SIGMASTAR_UBOOT_SOC_MODEL = $(SOC_MODEL)
 SIGMASTAR_UBOOT_SOC_FAMILY = $(SOC_FAMILY)
 

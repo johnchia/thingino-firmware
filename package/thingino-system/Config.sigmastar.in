@@ -5,13 +5,11 @@
 # than only under the Raptor HAL, which is where it used to hang -- a board that
 # picks a different streamer still needs /dev/mi_* to exist.
 #
-# osdrv-infinity6e is per-family, not per-vendor, so a second Infinity family
-# cannot simply be added to this select; it needs a family condition. That is
-# blocked on BR2_SOC_FAMILY being empty for this vendor -- Config.soc.in derives
-# it entirely from BR2_INGENIC_SOC_MODEL.
+# osdrv is per-family, not per-vendor: one select per Infinity family, each
+# gated on BR2_SOC_FAMILY, which Config.soc.in derives from the SoC model.
 config BR2_THINGINO_SYSTEM_PACKAGES_SIGMASTAR
 	bool
-	select BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6E
+	select BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6E if BR2_SOC_FAMILY = "infinity6e"
 	# ipcinfo, the counterpart of ingenic-diag-tools. load_sigmastar falls back
 	# to its i2c probe when the U-Boot sensor variable is unset, which is what
 	# lets one image serve every board of a model.
