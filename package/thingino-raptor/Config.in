@@ -6,8 +6,6 @@ config BR2_PACKAGE_THINGINO_RAPTOR
 	select BR2_PACKAGE_THINGINO_FONTS
 	select BR2_PACKAGE_THINGINO_LOGO
 	select BR2_PACKAGE_COMPY
-	# Vendor libraries come from the HAL, which is where the hardware
-	# abstraction boundary already is.
 	select BR2_PACKAGE_THINGINO_RAPTOR_HAL
 	select BR2_PACKAGE_THINGINO_RAPTOR_IPC
 	select BR2_PACKAGE_THINGINO_RAPTOR_COMMON
@@ -206,11 +204,8 @@ config BR2_PACKAGE_THINGINO_RAPTOR_AUDIO_EFFECTS
 	bool "Audio effects (NS/HPF/AGC)"
 	default y
 	help
-	  Noise suppression, high-pass filter, and automatic gain
-	  control. rad reaches these through the HAL vtable, so the
-	  backing library is the HAL backend's business; entries a
-	  backend does not implement are NULL-guarded into
-	  RSS_ERR_NOTSUP.
+	  Noise suppression, high-pass filter, and automatic
+	  gain control. Requires libaudioProcess.so (stock or neo).
 
 config BR2_PACKAGE_THINGINO_RAPTOR_DEBUG
 	bool "Debug build"
