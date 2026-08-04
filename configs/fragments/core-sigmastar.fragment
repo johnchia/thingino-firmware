@@ -72,10 +72,10 @@ BR2_PACKAGE_MDNSD_HTTP_SERVICE=y
 # BR2_PACKAGE_MDNSD_SSH_SERVICE is not set
 BR2_PACKAGE_THINGINO_ODHCP6C=y
 
-# The application layer -- the reason this fork exists. Deliberately the same
-# set core.fragment selects. Packages whose helpers this board has no hardware
-# for still build; the agent's capability probes report them false at runtime
-# and the web UI hides the controls.
+# The application layer. Deliberately the same set core.fragment selects, so a
+# SigmaStar board is a thingino camera and not a subset of one. Packages whose
+# helpers this board has no hardware for still build; the agent's capability
+# probes report them false at runtime and the web UI hides the controls.
 BR2_PACKAGE_TELEGRAMBOT=y
 BR2_PACKAGE_THINGINO_AGENT=y
 BR2_PACKAGE_THINGINO_DIAG=y

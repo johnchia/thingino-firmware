@@ -16,10 +16,18 @@
 # silicon combination (cf. the eight tplink_tapo variants).
 # FRAG: soc-infinity6e core-sigmastar ssl-mbedtls
 
-# board.mk includes this file as a makefile before thingino.mk runs, so these
-# two are read as plain make variables there and drive SOC_VENDOR/FAMILY/ARCH.
-# They are not Kconfig symbols; olddefconfig drops them from .config, the same
-# way it drops FLASH_SIZE_MB in the Ingenic camera configs.
+# board.mk includes this file as a makefile before thingino.mk runs, so all
+# three are readable there as plain make variables and drive SOC_VENDOR /
+# SOC_MODEL / SOC_FAMILY / SOC_ARCH.
+#
+# The vendor has to be declared here and not only in soc-infinity6e.fragment:
+# fragments are appended to .config, never included as makefiles, so a symbol
+# set only in a fragment is invisible to thingino.mk's vendor dispatch.
+#
+# BR2_SIGMASTAR_SOC_MODEL and _SOC_FAMILY are not Kconfig symbols; olddefconfig
+# drops them from .config, the same way it drops FLASH_SIZE_MB in the Ingenic
+# camera configs.
+BR2_SOC_VENDOR_SIGMASTAR=y
 BR2_SIGMASTAR_SOC_MODEL="ssc30kq"
 BR2_SIGMASTAR_SOC_FAMILY="infinity6e"
 
@@ -40,9 +48,10 @@ FLASH_SIZE_MB=16
 # The asset follows the naming the ext-*.fragment URLs already use -- the
 # release tag names the build host, the filename names the target.
 #
-# Built from Buildroot 2024.02.10, which is the last release offering GCC 13.3.0
-# and binutils 2.40 -- the compiler this board is validated on. Its sysroot is
-# bare, so nothing here needs package/sigmastar-toolchain-prune.
+# Built at upstream's current versions -- GCC 15.3.0, binutils 2.44, glibc 2.43
+# -- so this board tracks the same compiler as the Ingenic targets rather than
+# pinning one of its own. Its sysroot is bare, so nothing here needs
+# package/sigmastar-toolchain-prune.
 BR2_TOOLCHAIN_EXTERNAL_CUSTOM=y
 BR2_TOOLCHAIN_EXTERNAL_DOWNLOAD=y
 BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/johnchia/thingino-firmware/releases/download/toolchain-x86_64/thingino-toolchain-x86_64_infinity6e_glibc_gcc15-linux-arm.tar.gz"
@@ -54,7 +63,7 @@ BR2_TOOLCHAIN_EXTERNAL_CXX=y
 
 # Same reason: Makefile:580-588 appends 3.10 or 4.4 headers unconditionally
 # from the Ingenic KERNEL_VERSION, and runs before this file is appended. The
-# OpenIPC ARM toolchain ships 4.9 headers.
+# ARM toolchain named above is built against 4.9 headers.
 BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
 
 # Vendor U-Boot stays on the chip, so there is no uenv.txt and no full-chip
@@ -113,8 +122,9 @@ BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/infi
 # back to None with nothing in the build log to say why.
 BR2_THINGINO_DEV_IPCAM=y
 
-# thingino-raptor's Ingenic hard-selects are guarded on BR2_SOC_VENDOR_INGENIC,
-# so selecting Raptor here does not drag MIPS vendor blobs into an ARM rootfs.
+# raptor's vendor libraries hang off thingino-raptor-hal's per-vendor backend
+# symbol, so selecting Raptor here takes the SigmaStar backend rather than
+# dragging MIPS vendor blobs into an ARM rootfs.
 BR2_PACKAGE_THINGINO_STREAMER_RAPTOR=y
 
 # The vendor MI bundle. Also select-ed by thingino-raptor, but named here too:
@@ -122,10 +132,9 @@ BR2_PACKAGE_THINGINO_STREAMER_RAPTOR=y
 # this image should find it in the board's own config.
 BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6E=y
 
-# Phase 5: the bootloader. Builds the NOR boot image into images/ and installs
-# nothing to the target, so the flashed firmware is unchanged and the board
-# keeps booting the OEM bootloader. Built on every build rather than first
-# attempted on the day it is needed: BOOT.bin sits at 95% of the OEM 256KB
+# Builds the NOR boot image into images/ and installs nothing to the target, so
+# the board keeps booting the OEM bootloader. Built on every build rather than
+# first attempted on the day it is needed: BOOT.bin sits at 95% of the OEM 256KB
 # boot partition, which is worth watching before it is worth flashing.
 BR2_PACKAGE_SIGMASTAR_UBOOT=y
 

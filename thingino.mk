@@ -14,34 +14,34 @@ else
 SOC_VENDOR := ingenic
 endif
 
-# SigmaStar (Infinity6E) runs alongside the Ingenic path rather than replacing
-# it. BR2_SIGMASTAR_SOC_MODEL comes from the camera defconfig, which board.mk
-# includes as a makefile before this file. With it unset -- i.e. for every
-# Ingenic camera -- none of this executes and the logic below is unchanged.
-SIGMASTAR_SOC_MODEL_INPUT := $(call qstrip,$(BR2_SIGMASTAR_SOC_MODEL))
-ifneq ($(SIGMASTAR_SOC_MODEL_INPUT),)
-	SOC_VENDOR := sigmastar
-	SOC_MODEL := $(shell echo $(SIGMASTAR_SOC_MODEL_INPUT) | tr A-Z a-z)
-	SOC_FAMILY := $(call qstrip,$(BR2_SIGMASTAR_SOC_FAMILY))
-	# SOC_ARCH selects a board/kernel subdirectory. For Ingenic that is an ISA
-	# (xburst1/xburst2) shared by several families; here the family is the
-	# finest split that exists, so the two coincide.
-	SOC_ARCH := $(SOC_FAMILY)
-	# From the board's U-Boot bootargs: LX_MEM=0xFFE0000 is 268304384 bytes, so
-	# this is a 256MB part. (Of that, mma_heap sz=0x9E9C000 -- about 158MB -- is
-	# carved out for the multimedia heap, leaving Linux roughly 97MB.)
-	#
-	# Only feeds the Ingenic ISP module's rmem/nmem defaults further down, which
-	# this vendor does not load: on SigmaStar the carve-out is done by LX_MEM and
-	# mma_heap in the vendor U-Boot bootargs, which we do not touch. So this is
-	# inert here -- but it should still say what the hardware is.
-	SOC_RAM_MB := 256
-	# Set here so the Ingenic default chain below (guarded on an empty
-	# KERNEL_VERSION) leaves it alone. This vendor names its kernel source in
-	# its core fragment rather than through KERNEL_SITE/BRANCH/HASH, so the
-	# value only names the output directory.
-	KERNEL_VERSION := 4.9
-endif
+# One block per vendor. Each resolves the same four variables -- SOC_MODEL,
+# SOC_FAMILY, SOC_ARCH, SOC_RAM_MB -- and how it gets them is its own business.
+ifeq ($(SOC_VENDOR),sigmastar)
+
+# BR2_SIGMASTAR_* come from the camera defconfig, which board.mk includes as a
+# makefile before this file. They are not Kconfig symbols, so they are readable
+# here but not from any Config.in.
+SOC_MODEL := $(shell echo $(call qstrip,$(BR2_SIGMASTAR_SOC_MODEL)) | tr A-Z a-z)
+SOC_FAMILY := $(call qstrip,$(BR2_SIGMASTAR_SOC_FAMILY))
+# SOC_ARCH selects a board/kernel subdirectory. For Ingenic that is an ISA
+# (xburst1/xburst2) shared by several families; here the family is the finest
+# split that exists, so the two coincide.
+SOC_ARCH := $(SOC_FAMILY)
+# From the board's U-Boot bootargs: LX_MEM=0xFFE0000 is 268304384 bytes, so this
+# is a 256MB part. (Of that, mma_heap sz=0x9E9C000 -- about 158MB -- is carved
+# out for the multimedia heap, leaving Linux roughly 97MB.)
+#
+# Reaches .config as BR2_SOC_RAM_MB (Makefile:595), where the only consumers are
+# the Ingenic ISP module's rmem/nmem defaults. This vendor carves memory out in
+# the vendor U-Boot bootargs instead, but the value should still say what the
+# hardware is.
+SOC_RAM_MB := 256
+# Names the output directory, and keeps the Ingenic default chain below -- which
+# is guarded on an empty KERNEL_VERSION -- from claiming this vendor. The kernel
+# source is named in core-sigmastar.fragment, not through KERNEL_SITE/BRANCH.
+KERNEL_VERSION := 4.9
+
+else
 
 # Get SoC model from BR2_INGENIC_SOC_MODEL (single source of truth)
 SOC_MODEL_INPUT := $(call qstrip,$(BR2_INGENIC_SOC_MODEL))
@@ -63,6 +63,8 @@ ifneq ($(SOC_MODEL_INPUT),)
 		endif
 	endif
 endif
+
+endif # SOC_VENDOR
 
 SOC_FAMILY_CAPS := $(shell echo $(SOC_FAMILY) | tr a-z A-Z)
 SOC_MODEL_LESS_Z := $(subst z,,$(SOC_MODEL))
