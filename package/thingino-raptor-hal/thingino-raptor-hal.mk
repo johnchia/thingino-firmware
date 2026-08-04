@@ -5,12 +5,11 @@ THINGINO_RAPTOR_HAL_GIT_SUBMODULES = YES
 THINGINO_RAPTOR_HAL_INSTALL_STAGING = YES
 THINGINO_RAPTOR_HAL_INSTALL_TARGET = NO
 
-# SigmaStar builds no Ingenic headers and links no vendor library: raptor-hal's
-# Makefile leaves SDK_INCLUDE empty for that vendor and the MI ABI declarations
-# plus their dlopen thunks live in src/star/ inside the tree. The
-# INGENIC_HEADERS argument below is inert there for the same reason, so it is
-# left alone rather than made conditional.
-ifneq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
+# One block per vendor, matching the backend symbols in Config.in. SigmaStar
+# links no vendor library: the MI ABI declarations and their dlopen thunks live
+# in src/star/ inside the tree, which is also why INGENIC_HEADERS below is inert
+# there rather than conditional.
+ifeq ($(BR2_SOC_VENDOR_INGENIC),y)
 THINGINO_RAPTOR_HAL_DEPENDENCIES = ingenic-lib
 endif
 
