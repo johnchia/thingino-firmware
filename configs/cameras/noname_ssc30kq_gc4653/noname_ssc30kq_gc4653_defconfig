@@ -127,21 +127,11 @@ BR2_THINGINO_DEV_IPCAM=y
 # dragging MIPS vendor blobs into an ARM rootfs.
 BR2_PACKAGE_THINGINO_STREAMER_RAPTOR=y
 
-# The vendor MI bundle. Also select-ed by thingino-raptor, but named here too:
-# the dependency is a dlopen, and a reader looking for what puts /dev/mi_* on
-# this image should find it in the board's own config.
-BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6E=y
-
 # Builds the NOR boot image into images/ and installs nothing to the target, so
 # the board keeps booting the OEM bootloader. Built on every build rather than
 # first attempted on the day it is needed: BOOT.bin sits at 95% of the OEM 256KB
 # boot partition, which is worth watching before it is worth flashing.
 BR2_PACKAGE_SIGMASTAR_UBOOT=y
-
-# ipcinfo, for load_sigmastar's sensor probe. Not needed on this unit -- its
-# OEM env already says sensor=gc4653 -- but this target is meant to run on any
-# SSC30KQ, including boards whose vendor never set the variable.
-BR2_PACKAGE_IPCTOOL=y
 
 # Daemon selection: the set OpenIPC's ssc30kq_raptor target actually brought
 # up on this silicon (rvd/rsd/rad/rod/ric), plus rhd.

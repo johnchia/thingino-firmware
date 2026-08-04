@@ -1,0 +1,18 @@
+# SigmaStar's half of BR2_THINGINO_SYSTEM_PACKAGES, mirroring Config.ingenic.in.
+#
+# The MI bundle is the counterpart of ingenic-sdk plus ingenic-lib: vendor
+# kernel modules and the userspace libraries above them. It belongs here rather
+# than only under the Raptor HAL, which is where it used to hang -- a board that
+# picks a different streamer still needs /dev/mi_* to exist.
+#
+# osdrv-infinity6e is per-family, not per-vendor, so a second Infinity family
+# cannot simply be added to this select; it needs a family condition. That is
+# blocked on BR2_SOC_FAMILY being empty for this vendor -- Config.soc.in derives
+# it entirely from BR2_INGENIC_SOC_MODEL.
+config BR2_THINGINO_SYSTEM_PACKAGES_SIGMASTAR
+	bool
+	select BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6E
+	# ipcinfo, the counterpart of ingenic-diag-tools. load_sigmastar falls back
+	# to its i2c probe when the U-Boot sensor variable is unset, which is what
+	# lets one image serve every board of a model.
+	select BR2_PACKAGE_IPCTOOL
