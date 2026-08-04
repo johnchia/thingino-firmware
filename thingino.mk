@@ -37,8 +37,9 @@ ifneq ($(SIGMASTAR_SOC_MODEL_INPUT),)
 	# inert here -- but it should still say what the hardware is.
 	SOC_RAM_MB := 256
 	# Set here so the Ingenic default chain below (guarded on an empty
-	# KERNEL_VERSION) leaves it alone. The tree is pulled as a tarball, not from
-	# KERNEL_SITE/BRANCH/HASH, so this value only names the output directory.
+	# KERNEL_VERSION) leaves it alone. This vendor names its kernel source in
+	# its core fragment rather than through KERNEL_SITE/BRANCH/HASH, so the
+	# value only names the output directory.
 	KERNEL_VERSION := 4.9
 endif
 
@@ -95,9 +96,10 @@ ifeq ($(KERNEL_VERSION),)
 	endif
 endif
 
-# SigmaStar pulls its kernel as a tarball (see core-sigmastar.fragment) and sets
-# none of KERNEL_SITE/BRANCH/HASH. Unguarded, the git ls-remote at the end of
-# this block would also run on every make for a vendor that never reads it.
+# Only the Ingenic path maps SOC_FAMILY onto a kernel branch. Other vendors name
+# their source in their core fragment, so there is nothing here to resolve --
+# and the git ls-remote below would otherwise run on every make for a value that
+# vendor never reads.
 ifeq ($(SOC_VENDOR),ingenic)
 
 KERNEL_SITE := https://github.com/gtxaspec/thingino-linux
