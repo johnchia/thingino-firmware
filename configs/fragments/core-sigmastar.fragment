@@ -21,12 +21,12 @@ BR2_PER_PACKAGE_DIRECTORIES=y
 # The toolchain fragment is picked by name from TYPE/GCC/LIBC alone
 # (Makefile:185), which has no architecture in it, so the resolved file is
 # always the mipsel one. The camera defconfig re-points URL and PREFIX at the
-# OpenIPC ARM toolchain afterwards -- see the comment there.
-# GCC 13, not 14: the OpenIPC ARM toolchain ships gcc 13.3.0, and Buildroot
-# hard-checks the declared version against the real one at configure time
-# ("Incorrect selection of gcc version: expected 14.x, got 13.3.0").
+# ARM toolchain afterwards -- see the comment there.
+# Must track the gcc version the camera defconfig declares: Buildroot
+# hard-checks the declared version against the real toolchain at configure
+# time, and a version with no ext-gccNN-glibc.fragment fails Makefile:558.
 BR2_THINGINO_TOOLCHAIN_TYPE_EXTERNAL=y
-BR2_THINGINO_TOOLCHAIN_GCC_13=y
+BR2_THINGINO_TOOLCHAIN_GCC_15=y
 BR2_THINGINO_TOOLCHAIN_LIBC_GLIBC=y
 
 BR2_TARGET_GENERIC_HOSTNAME="thingino-$(SOC_MODEL)"
