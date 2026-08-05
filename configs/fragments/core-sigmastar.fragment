@@ -39,19 +39,28 @@ BR2_SYSTEM_DEFAULT_PATH="/bin:/sbin:/usr/bin:/usr/sbin"
 BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_THINGINO_PATH)/overlay"
 BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/scripts/rootfs_script.sh"
 
-# Kernel: the OpenIPC sigmastar-infinity6e tree, as a tarball. thingino's
-# Ingenic path uses BR2_LINUX_KERNEL_CUSTOM_GIT with KERNEL_SITE/BRANCH/HASH;
-# those variables are not set for this vendor (see thingino.mk).
+# Kernel: a fork of OpenIPC's sigmastar-infinity6e tree, pinned by hash.
+#
+# It was fetched as archive/sigmastar-$(SOC_FAMILY).tar.gz, which names a branch
+# rather than a commit: the tree could change under a build with nothing in the
+# image recording what was used. The fork exists so the vendor fixes this port
+# needs are commits with a history instead of a patch directory, and so the
+# revision is pinned.
+#
+# No BR2_LINUX_KERNEL_CUSTOM_REPO_BRANCH here -- Buildroot has no such symbol
+# (linux/Config.in defines only _REPO_VERSION), so the line in core.fragment is
+# inert. The hash below is the only thing that selects the revision.
 BR2_LINUX_KERNEL=y
-BR2_LINUX_KERNEL_CUSTOM_TARBALL=y
-BR2_LINUX_KERNEL_CUSTOM_TARBALL_LOCATION="https://github.com/openipc/linux/archive/sigmastar-$(SOC_FAMILY).tar.gz"
+BR2_LINUX_KERNEL_CUSTOM_GIT=y
+BR2_LINUX_KERNEL_CUSTOM_REPO_URL="https://github.com/johnchia/linux"
+BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="d85ef37e8ed2367db6b4b9a58d959d598d5cc130"
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
 BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/infinity6e-ssc012b.config"
 
-# Vendor-tree fixes. core.fragment points this at
-# package/all-patches/linux/$(KERNEL_VERSION), which is the Ingenic 4.9 set and
-# must not be applied to an OpenIPC SigmaStar tree.
-BR2_LINUX_KERNEL_PATCH="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/patches"
+# No BR2_LINUX_KERNEL_PATCH. The one fix this tree needed -- the Sun/Solaris
+# section flags binutils 2.42+ rejects -- is a commit in the fork. Leaving the
+# symbol unset also keeps core.fragment's Ingenic 4.9 patch directory from ever
+# applying here.
 BR2_LINUX_KERNEL_UIMAGE=y
 BR2_LINUX_KERNEL_XZ=y
 # BR2_LINUX_KERNEL_INSTALL_TARGET is not set
