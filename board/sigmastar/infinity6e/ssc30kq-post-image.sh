@@ -166,10 +166,14 @@ UENV_TXT="$BINARIES_DIR/uenv.txt"
 # them off the running camera and put them back after flashing mtd1 -- see the
 # camera README.
 #
-# Neither is load-bearing at boot: S03mac derives the MAC from the SoC die ID
-# without consulting ethaddr, and load_sigmastar re-probes i2c whenever sensor
-# is empty. ethaddr is worth keeping anyway, because the environment is its only
-# record and an erase is the moment it stops existing anywhere.
+# ethaddr is not load-bearing at boot -- S03mac derives the MAC from the SoC die
+# ID without consulting it -- but it is worth keeping anyway, because the
+# environment is its only record and an erase is the moment it stops existing
+# anywhere.
+#
+# sensor IS load-bearing. There is no sensor autodetection on this platform, so
+# load_sigmastar stops and the camera does not stream if the variable is gone.
+# Save it before erasing.
 {
 	echo "baseaddr=0x21000000"
 	echo "kernaddr=$(printf '0x%x' "$KERN_ADDR")"

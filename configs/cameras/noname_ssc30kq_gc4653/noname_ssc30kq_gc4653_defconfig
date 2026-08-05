@@ -29,7 +29,7 @@
 BR2_SOC_VENDOR_SIGMASTAR=y
 BR2_SIGMASTAR_SOC_MODEL="ssc30kq"
 
-# Selects which IQ blob sigmastar-osdrv-infinity6e installs to
+# Selects which IQ blob sigmastar-sdk-infinity6e installs to
 # /usr/share/sensor. raptor still probes i2c at runtime and binds whichever of
 # the six drivers matches, so a board carrying a different sensor streams
 # normally on the generic /etc/firmware/iqfile0.bin -- the cost is colour, not
@@ -99,7 +99,7 @@ BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
 # a fossil from a first boot that ran `sf probe 0; saveenv`.
 #
 # So the partition auto-sizes to the image and needs no management here. Phase
-# 2's osdrv payload pushes the image past the threshold; it gets the 8192KB
+# 2's SDK payload pushes the image past the threshold; it gets the 8192KB
 # partition on its own. Two things follow: mtd4's offset MOVES when that
 # happens, so erase the overlay after the resize boot rather than before, and
 # `fw_printenv rootmtd` is not authoritative for anything. Read the image size,

@@ -94,7 +94,7 @@ jobs:
 
       # Downloads only, so a stale entry is never wrong, only incomplete. Keyed
       # loosely on purpose: the point is to avoid refetching the ARM toolchain
-      # and the vendor osdrv tarball on every run.
+      # and the vendor SDK tarball on every run.
       - name: Restore download cache
         uses: actions/cache@v5
         with:

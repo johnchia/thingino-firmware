@@ -125,9 +125,11 @@ route for a unit under a DHCP reservation made against the assigned address —
 and it has to be re-entered after any full upgrade, since the overlay holding
 `eth.mac` is erased along with everything else.
 
-`sensor` needs no saving at all. `load_sigmastar` probes i2c through `ipcinfo`
-whenever the variable is empty and writes the answer back, so it repairs itself
-on the next boot.
+`sensor` has to be saved too, and it is the one variable the board cannot
+recover on its own: there is no sensor autodetection on this platform. OpenIPC's
+`ipctool` used to supply the i2c probe and has been dropped; thingino's own
+detector (`sensor-info`/`sinfo`) is Ingenic-only. Until that learns SigmaStar,
+an unset `sensor` means `load_sigmastar` stops and the camera does not stream.
 
 **The hostname comes from the same place and does not track the MAC.**
 `S04hostname` builds the name from the last four hex digits of `soc -s`, falling
@@ -342,8 +344,8 @@ The cost is that the assigned MAC is not used even when it is present, and a
 site that needs it must re-enter it on the network page after each full upgrade.
 That is a deliberate trade — a 48-bit fab-burned die ID makes collisions
 vanishingly unlikely, and the derived address is locally-administered, so it
-never claims to be globally unique. `sensor` needs no equivalent treatment;
-`load_sigmastar` re-probes i2c whenever the variable is empty and writes it back.
+never claims to be globally unique. `sensor` gets no equivalent safety net — it
+has no autodetection to fall back on, so it must be saved and restored by hand.
 
 ### If the environment is lost
 
