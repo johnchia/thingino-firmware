@@ -3,10 +3,18 @@
 # sigmastar-osdrv-infinity6e
 #
 # The SigmaStar vendor MI bundle, ported from OpenIPC's package of the same
-# name. Prebuilt binaries, so there is nothing to download and nothing to
-# compile -- the whole package is an install step.
+# name. Prebuilt binaries, so there is nothing to compile -- the package is a
+# fetch plus an install step.
 #
-# It carries four kinds of payload, and they are not interchangeable:
+# The binaries are fetched from johnchia/sigmastar-osdrv rather than checked in
+# here, following ingenic-lib. 6.9 MB of PROPRIETARY payload in this tree made
+# REDISTRIBUTE = NO untrue: git redistributes it on every clone, which is the
+# thing that flag exists to prevent.
+#
+# Pinned by hash, never a branch -- a branch would let the payload change under
+# a build with nothing in the image recording which one was used.
+#
+# Fetched payload, one directory per family ($(@D)/$(SOC_FAMILY)):
 #
 #   kmod/    the mi_* and mhal kernel modules. Vendor-built against Linux
 #            4.9.84; insmod verifies vermagic, so these only load on the
@@ -18,12 +26,17 @@
 #            and then fail at the first HAL call.
 #   sensor/  per-sensor ISP tuning blobs (configs/) and the ISP firmware
 #            plus IQ file (firmware/).
-#   script/  load_sigmastar, which does the actual insmod ordering.
+#
+# Kept in this package ($(PKGDIR)/files): load_sigmastar, which does the insmod
+# ordering, zoom.sh, and the S20sigmastar init script. They are ours and are
+# text, so they belong where they can be reviewed and diffed.
 #
 ################################################################################
 
-SIGMASTAR_OSDRV_INFINITY6E_VERSION = vendor
-SIGMASTAR_OSDRV_INFINITY6E_SOURCE =
+SIGMASTAR_OSDRV_INFINITY6E_SITE_METHOD = git
+SIGMASTAR_OSDRV_INFINITY6E_SITE = https://github.com/johnchia/sigmastar-osdrv
+SIGMASTAR_OSDRV_INFINITY6E_SITE_BRANCH = main
+SIGMASTAR_OSDRV_INFINITY6E_VERSION = f4c94a041796b1d07aeb730702f445c8ba171d41
 SIGMASTAR_OSDRV_INFINITY6E_LICENSE = PROPRIETARY
 SIGMASTAR_OSDRV_INFINITY6E_REDISTRIBUTE = NO
 
@@ -38,6 +51,11 @@ SIGMASTAR_OSDRV_INFINITY6E_REDISTRIBUTE = NO
 SIGMASTAR_OSDRV_INFINITY6E_DEPENDENCIES = linux
 SIGMASTAR_OSDRV_INFINITY6E_KREL = $(LINUX_VERSION_PROBED)
 
+# The fetched tree holds one directory per Infinity family, so adding a family
+# to the blob repo needs no change here. Config.sigmastar.in only selects this
+# package when BR2_SOC_FAMILY is "infinity6e", so the two always agree.
+SIGMASTAR_OSDRV_INFINITY6E_BLOBS = $(@D)/$(SOC_FAMILY)
+
 # Board-specific tuning, path relative to the BR2_EXTERNAL root as ingenic-sdk
 # reads it. Left unset the stock blob is installed.
 ifneq ($(call qstrip,$(BR2_SENSOR_1_IQ_FILE)),)
@@ -48,15 +66,15 @@ endif
 define SIGMASTAR_OSDRV_INFINITY6E_INSTALL_TARGET_CMDS
 	$(INSTALL) -m 755 -d $(TARGET_DIR)/lib/modules/$(SIGMASTAR_OSDRV_INFINITY6E_KREL)/sigmastar
 	$(INSTALL) -m 644 -t $(TARGET_DIR)/lib/modules/$(SIGMASTAR_OSDRV_INFINITY6E_KREL)/sigmastar \
-		$(SIGMASTAR_OSDRV_INFINITY6E_PKGDIR)/files/kmod/*
+		$(SIGMASTAR_OSDRV_INFINITY6E_BLOBS)/kmod/*
 
 	$(INSTALL) -m 755 -d $(TARGET_DIR)/usr/lib
 	$(INSTALL) -m 644 -t $(TARGET_DIR)/usr/lib \
-		$(SIGMASTAR_OSDRV_INFINITY6E_PKGDIR)/files/lib/*
+		$(SIGMASTAR_OSDRV_INFINITY6E_BLOBS)/lib/*
 
 	$(INSTALL) -m 755 -d $(TARGET_DIR)/etc/firmware
 	$(INSTALL) -m 644 -t $(TARGET_DIR)/etc/firmware \
-		$(SIGMASTAR_OSDRV_INFINITY6E_PKGDIR)/files/sensor/firmware/*
+		$(SIGMASTAR_OSDRV_INFINITY6E_BLOBS)/sensor/firmware/*
 
 	# One sensor per target, in the shape ingenic-sdk installs: the blob under
 	# /usr/share/sensor, an /etc/sensor symlink, and a model file.
@@ -76,7 +94,7 @@ define SIGMASTAR_OSDRV_INFINITY6E_INSTALL_TARGET_CMDS
 				$(TARGET_DIR)/usr/share/sensor/$(SENSOR_1_MODEL).bin; \
 		else \
 			$(INSTALL) -D -m 644 \
-				$(SIGMASTAR_OSDRV_INFINITY6E_PKGDIR)/files/sensor/configs/$(SENSOR_1_MODEL).bin \
+				$(SIGMASTAR_OSDRV_INFINITY6E_BLOBS)/sensor/configs/$(SENSOR_1_MODEL).bin \
 				$(TARGET_DIR)/usr/share/sensor/$(SENSOR_1_MODEL).bin; \
 		fi; \
 		echo $(SENSOR_1_MODEL) > $(TARGET_DIR)/usr/share/sensor/model; \
