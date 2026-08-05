@@ -9,9 +9,8 @@
 #
 # Every driver the tree has for this family is built and installed. Selecting
 # one is a runtime decision made by load_sigmastar from the U-Boot `sensor`
-# variable, or from an `ipcinfo -s` probe when that is unset. Narrowing the
-# build to the sensor on the development board is exactly the thing this
-# target must not do.
+# variable. Narrowing the build to the sensor on the development board is
+# exactly the thing this target must not do.
 #
 ################################################################################
 

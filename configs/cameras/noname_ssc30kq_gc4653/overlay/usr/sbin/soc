@@ -14,8 +14,8 @@
 # do not merely fail, they fault, and STRICT_DEVMEM is off so nothing stops them.
 #
 # This replacement uses no devmem at all. Everything it reports comes from
-# /etc/os-release (stamped at build time by scripts/rootfs_script.sh), from
-# procfs, or from ipcinfo.
+# /etc/os-release (stamped at build time by scripts/rootfs_script.sh) or from
+# procfs.
 #
 # Camera overlay rather than a package: Makefile:598 appends the camera overlay
 # to BR2_ROOTFS_OVERLAY, and overlays are applied at buildroot/Makefile:809 --
@@ -36,10 +36,8 @@ os_release_value() {
 	sed -rn "s/^$1=\"?([^\"]*)\"?$/\1/p" "$OS_RELEASE" | head -n1
 }
 
-# ipcinfo -c cannot supply this: sstar_detect_cpu() maps both INFINITY6B and
-# INFINITY6E to the string "SSC33X" (ipctool src/hal/sstar.c), so it is a
-# generation, not a model. This overlay is board-scoped by construction, so the
-# model is stated here.
+# Stated here because this overlay is board-scoped by construction. Once the
+# model is stamped into /etc/os-release it can be read like the family below.
 print_soc_model() {
 	echo "ssc30kq"
 }

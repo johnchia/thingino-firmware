@@ -7,10 +7,9 @@
 # "/proc/jz/sensor does not exist." on every call. Unlike `soc` this one is
 # harmless (no devmem, so no fault), but it reports nothing useful.
 #
-# The equivalent facts on SigmaStar come from three places:
-#   name    - ipcinfo -s probes the sensor over i2c; load_sigmastar caches the
-#             result in the U-Boot `sensor` variable, which is cheaper to read
-#             and survives when sensor_config.ko is not loaded.
+# The equivalent facts on SigmaStar come from two places:
+#   name    - the U-Boot `sensor` variable, which is the only source on this
+#             platform: there is no native i2c probe for SigmaStar yet.
 #   width,  - the running streamer's config. raptorctl reads the live values
 #   height,   from rvd, so these follow a runtime change rather than the
 #   fps       build-time defconfig.
@@ -19,9 +18,7 @@
 # rather than a package.
 
 sensor_name() {
-	name=$(fw_printenv -n sensor 2>/dev/null)
-	[ -n "$name" ] || name=$(ipcinfo -s 2>/dev/null)
-	printf '%s' "$name"
+	fw_printenv -n sensor 2>/dev/null
 }
 
 raptor_get() {

@@ -10,7 +10,3 @@
 config BR2_THINGINO_SYSTEM_PACKAGES_SIGMASTAR
 	bool
 	select BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6E if BR2_SOC_FAMILY = "infinity6e"
-	# ipcinfo, the counterpart of ingenic-diag-tools. load_sigmastar falls back
-	# to its i2c probe when the U-Boot sensor variable is unset, which is what
-	# lets one image serve every board of a model.
-	select BR2_PACKAGE_IPCTOOL

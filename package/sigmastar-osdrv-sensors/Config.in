@@ -6,8 +6,11 @@ config BR2_PACKAGE_SIGMASTAR_OSDRV_SENSORS
 	  SigmaStar sensor driver kernel modules, built from source for the
 	  configured Infinity family.
 
-	  Produces sensor_config.ko (the i2c probe that backs `ipcinfo -s`)
-	  and one sensor_<model>_mipi.ko per supported sensor. All of them
-	  are installed; load_sigmastar picks one at runtime.
+	  Produces one sensor_<model>_mipi.ko per supported sensor, plus
+	  sensor_config.ko, which exposes the i2c probe over /dev/srcfg.
+	  All are installed; load_sigmastar picks one at runtime from the
+	  U-Boot `sensor` variable. Nothing loads sensor_config.ko now that
+	  ipctool is gone -- it is what a native SigmaStar detector would
+	  drive.
 
 	  https://github.com/openipc/sensors

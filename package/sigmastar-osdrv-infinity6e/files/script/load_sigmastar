@@ -12,44 +12,22 @@
 #      with a message about the module, not about the path.
 #   2. The OpenIPC-specific bits are gone: the `fpv` check against
 #      /etc/os-release, and the OpenIPC logger tag.
-#   3. Autodetection degrades instead of failing. `ipcinfo` comes from the
-#      ipctool package; if it is not in the image, the U-Boot `sensor`
-#      variable is the only source and we say so rather than reporting an
-#      empty sensor name.
+#   3. There is no sensor autodetection. The U-Boot `sensor` variable is the
+#      only source; if it is unset the script says so and stops.
 #
-# Argument: any non-empty first argument means "trust the stored sensor
-# variable if there is one". The init script passes -i, matching OpenIPC's
-# S70vendor. Called with no arguments it always re-probes, which is what you
-# want when swapping a sensor on the bench.
+# The i2c probe used to come from OpenIPC's ipctool. That package is gone, and
+# thingino's own detector (sensor-info/sinfo) is Ingenic-only, so this platform
+# has no native probe to fall back on yet. Restore autodetection here once
+# sensor-info learns SigmaStar -- do not reintroduce ipctool.
+#
+# Argument: accepted and ignored, so the init script's `-i` keeps working. It
+# used to mean "trust the stored variable rather than re-probing", a
+# distinction with no meaning now that the variable is the only source.
 
 MODULE=/lib/modules/$(uname -r)/sigmastar
 SENSOR=$(fw_printenv -n sensor 2>/dev/null)
 
 log() { echo "$@" | logger -s -t sigmastar; }
-
-detect_sensor() {
-	if [ ! -x /usr/bin/ipcinfo ] && ! command -v ipcinfo >/dev/null 2>&1; then
-		log "no ipcinfo in this image -- cannot probe, set the U-Boot 'sensor' variable"
-		return 1
-	fi
-
-	# sensor_config.ko exposes /dev/srcfg; writing this line runs the i2c
-	# probe whose result ipcinfo then reads back.
-	insmod $MODULE/sensor_config.ko 2>/dev/null
-	if [ -e /dev/srcfg ]; then
-		echo srcfg 0 1 0 0 0 0 >/dev/srcfg
-		rmmod sensor_config
-	fi
-
-	SENSOR=$(ipcinfo -s 2>/dev/null)
-	[ -n "$SENSOR" ] || return 1
-
-	# Persist so later boots skip the probe. Only written when it actually
-	# changes: this runs on every boot and the env partition is NOR.
-	if [ "$SENSOR" != "$(fw_printenv -n sensor 2>/dev/null)" ]; then
-		fw_setenv sensor "$SENSOR"
-	fi
-}
 
 set_sensor() {
 	case $SENSOR in
@@ -102,11 +80,6 @@ fi
 
 if [ ! -e /sys/module/mi_common ]; then
 	insert_ko
-fi
-
-if [ -z "$1" ] || [ -z "$SENSOR" ]; then
-	log "probing for sensor"
-	detect_sensor
 fi
 
 if [ -z "$SENSOR" ]; then
