@@ -13,7 +13,8 @@
 #   2. The OpenIPC-specific bits are gone: the `fpv` check against
 #      /etc/os-release, and the OpenIPC logger tag.
 #   3. There is no sensor autodetection. The U-Boot `sensor` variable is the
-#      only source; if it is unset the script says so and stops.
+#      per-unit override; when it is unset the build-time name installed at
+#      /usr/share/sensor/model is used instead.
 #
 # The i2c probe used to come from OpenIPC's ipctool. That package is gone, and
 # thingino's own detector (sensor-info/sinfo) is Ingenic-only, so this platform
@@ -26,6 +27,16 @@
 
 MODULE=/lib/modules/$(uname -r)/sigmastar
 SENSOR=$(fw_printenv -n sensor 2>/dev/null)
+
+# A full sysupgrade erases the environment, so the variable cannot be the only
+# source: without this the camera does not stream until it is re-entered by
+# hand, and there is no remote recovery. The environment is never written back
+# -- it stays the per-unit override and wins wherever it exists.
+# model is written by sigmastar-sdk-infinity6e from SENSOR_1_MODEL.
+if [ -z "$SENSOR" ] && [ -r /usr/share/sensor/model ]; then
+	SENSOR=$(cat /usr/share/sensor/model)
+	SENSOR_FROM_BUILD=1
+fi
 
 log() { echo "$@" | logger -s -t sigmastar; }
 
@@ -86,6 +97,10 @@ if [ -z "$SENSOR" ]; then
 	log "no sensor identified -- set the U-Boot 'sensor' variable"
 	exit 1
 fi
+
+# Named explicitly: a board whose sensor differs from the target's is corrected
+# by setting the variable, and the log is the only place that is visible.
+[ -n "$SENSOR_FROM_BUILD" ] && log "U-Boot 'sensor' unset, using build-time $SENSOR"
 
 # Re-binding: drop whatever driver is already bound before inserting one.
 DRIVER=$(ls /sys/module | grep "$SENSOR")

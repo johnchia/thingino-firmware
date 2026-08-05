@@ -171,9 +171,11 @@ UENV_TXT="$BINARIES_DIR/uenv.txt"
 # environment is its only record and an erase is the moment it stops existing
 # anywhere.
 #
-# sensor IS load-bearing. There is no sensor autodetection on this platform, so
-# load_sigmastar stops and the camera does not stream if the variable is gone.
-# Save it before erasing.
+# sensor is the per-unit override. There is no autodetection on this platform,
+# but load_sigmastar falls back to the build-time name at
+# /usr/share/sensor/model, so an erase no longer stops the camera streaming.
+# Still worth saving on a board whose sensor differs from the target's, because
+# that is the case the fallback gets wrong.
 {
 	echo "baseaddr=0x21000000"
 	echo "kernaddr=$(printf '0x%x' "$KERN_ADDR")"

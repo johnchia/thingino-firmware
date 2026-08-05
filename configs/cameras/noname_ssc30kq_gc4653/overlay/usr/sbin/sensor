@@ -8,8 +8,9 @@
 # harmless (no devmem, so no fault), but it reports nothing useful.
 #
 # The equivalent facts on SigmaStar come from two places:
-#   name    - the U-Boot `sensor` variable, which is the only source on this
-#             platform: there is no native i2c probe for SigmaStar yet.
+#   name    - the U-Boot `sensor` variable, falling back to the build-time name
+#             at /usr/share/sensor/model: there is no native i2c probe for
+#             SigmaStar yet, and a full sysupgrade erases the variable.
 #   width,  - the running streamer's config. raptorctl reads the live values
 #   height,   from rvd, so these follow a runtime change rather than the
 #   fps       build-time defconfig.
@@ -18,7 +19,9 @@
 # rather than a package.
 
 sensor_name() {
-	fw_printenv -n sensor 2>/dev/null
+	n=$(fw_printenv -n sensor 2>/dev/null)
+	[ -n "$n" ] || n=$(cat /usr/share/sensor/model 2>/dev/null)
+	printf '%s' "$n"
 }
 
 raptor_get() {
