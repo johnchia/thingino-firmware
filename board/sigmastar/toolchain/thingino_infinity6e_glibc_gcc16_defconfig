@@ -1,9 +1,9 @@
 # Toolchain producer for SigmaStar Infinity6E (ARMv7 cortex-a7, hard float).
 #
 # This is a BUILDROOT defconfig, not a thingino camera defconfig. It builds
-# against the pinned submodule: that is where gcc 15.3.0 and binutils 2.44 come
-# from, and they are the exact versions
-# configs/github/toolchain_*_gcc15_defconfig selects for every Ingenic
+# against the pinned submodule: that is where gcc 16.1.0 and binutils 2.45.1
+# come from, and they are the exact versions
+# configs/github/toolchain_*_gcc16_defconfig selects for every Ingenic
 # toolchain. Matching them is what lets this producer run in upstream's own
 # toolchain workflow.
 BR2_arm=y
@@ -30,8 +30,8 @@ BR2_KERNEL_HEADERS_VERSION=y
 BR2_DEFAULT_KERNEL_VERSION="4.9.84"
 BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_4_9=y
 
-BR2_BINUTILS_VERSION_2_44_X=y
-BR2_GCC_VERSION_15_X=y
+BR2_BINUTILS_VERSION_2_45_X=y
+BR2_GCC_VERSION_16_X=y
 BR2_TOOLCHAIN_BUILDROOT_CXX=y
 
 BR2_CCACHE=y

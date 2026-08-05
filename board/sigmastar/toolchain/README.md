@@ -11,24 +11,27 @@ The three versions that must not drift, read back from the toolchain the board
 currently builds with:
 
 ```
-arm-thingino-linux-gnueabihf-gcc.br_real (Buildroot 2026.05-610-g9bc585a804) 15.3.0
-GNU ld (GNU Binutils) 2.44
+arm-thingino-linux-gnueabihf-gcc.br_real (Buildroot 2026.05-610-g9bc585a804) 16.1.0
+GNU ld (GNU Binutils) 2.45.1
 GNU C Library (Buildroot) stable release version 2.43.
 ```
 
+glibc did not move with the compiler — the same submodule supplies it, so the
+prebuilt vendor `.so` the Raptor HAL dlopens still see 2.43.
+
 The Buildroot version in the first line is the pinned `buildroot/` submodule,
-not a separate checkout. That is deliberate: gcc 15.3.0 and binutils 2.44 are
-the versions `configs/github/toolchain_*_gcc15_defconfig` already selects for
+not a separate checkout. That is deliberate: gcc 16.1.0 and binutils 2.45.1 are
+the versions `configs/github/toolchain_*_gcc16_defconfig` already selects for
 every Ingenic toolchain, so matching them is what lets this producer run in
 upstream's own toolchain workflow rather than by hand.
 
 ## Building
 
 ```sh
-cp board/sigmastar/toolchain/thingino_infinity6e_glibc_gcc15_defconfig \
+cp board/sigmastar/toolchain/thingino_infinity6e_glibc_gcc16_defconfig \
    buildroot/configs/
 cd buildroot
-make thingino_infinity6e_glibc_gcc15_defconfig
+make thingino_infinity6e_glibc_gcc16_defconfig
 make && make sdk
 ```
 
@@ -38,16 +41,17 @@ names the build host, the filename names the target — and upload it:
 
 ```sh
 mv output/images/arm-thingino-linux-gnueabihf_sdk-buildroot.tar.gz \
-   thingino-toolchain-x86_64_infinity6e_glibc_gcc15-linux-arm.tar.gz
+   thingino-toolchain-x86_64_infinity6e_glibc_gcc16-linux-arm.tar.gz
 gh release upload toolchain-x86_64 thingino-toolchain-*.tar.gz --clobber
 ```
 
 ## Checking a build
 
 ```sh
-./output/host/bin/arm-thingino-linux-gnueabihf-gcc --version   # 15.3.0
-./output/host/bin/arm-thingino-linux-gnueabihf-ld  --version   # 2.44
+./output/host/bin/arm-thingino-linux-gnueabihf-gcc --version   # 16.1.0
+./output/host/bin/arm-thingino-linux-gnueabihf-ld  --version   # 2.45.1
 strings output/host/*/sysroot/lib/libc.so.6 | grep 'GNU C Library'  # 2.43
+grep LINUX_VERSION_CODE output/host/*/sysroot/usr/include/linux/version.h  # 264532 = 4.9.84
 ```
 
 The sysroot must stay **bare** — glibc, libstdc++, libgcc and kernel headers,
@@ -62,7 +66,7 @@ step is needed here.
 ## Taking this upstream
 
 `toolchain-x86_64.yaml` name-globs `configs/github/*defconfig` for its matrix
-and filters on `gcc15`, so a producer placed in that directory is built and
+and filters on `gcc16`, so a producer placed in that directory is built and
 published with no workflow change. Two things are still needed first:
 
 - this defconfig gains the wrapper symbols the Ingenic producers carry —
