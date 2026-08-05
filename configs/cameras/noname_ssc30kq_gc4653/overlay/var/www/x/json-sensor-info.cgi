@@ -7,7 +7,7 @@
 #   1. the sensor name is read from /proc/jz/sensor/sensor0/name, which is
 #      created by Ingenic's tx-isp driver and does not exist here;
 #   2. the tuning file is looked for at /etc/sensor/<sensor>-<soc>.bin, which
-#      is the Ingenic layout. sigmastar-osdrv-infinity6e installs the ISP
+#      is the Ingenic layout. sigmastar-sdk-infinity6e installs the ISP
 #      tuning blobs as /etc/sensors/<sensor>.bin -- plural directory, and no
 #      SoC in the filename, because the blob is per-sensor and all six ship on
 #      every image for autodetect.

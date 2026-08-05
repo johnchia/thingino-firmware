@@ -1,12 +1,16 @@
 ################################################################################
 #
-# sigmastar-osdrv-infinity6e
+# sigmastar-sdk-infinity6e
 #
-# The SigmaStar vendor MI bundle, ported from OpenIPC's package of the same
-# name. Prebuilt binaries, so there is nothing to compile -- the package is a
-# fetch plus an install step.
+# The SigmaStar vendor MI bundle, ported from OpenIPC's
+# sigmastar-osdrv-infinity6e. Prebuilt binaries, so there is nothing to compile
+# -- the package is a fetch plus an install step.
 #
-# The binaries are fetched from johnchia/sigmastar-osdrv rather than checked in
+# Named -sdk, not -osdrv: "osdrv" is OpenIPC's word, applied uniformly to every
+# vendor they support and inherited from HiSilicon's SDK layout. It appears
+# nowhere in SigmaStar's own tree, which calls this stack MI.
+#
+# The binaries are fetched from johnchia/sigmastar-sdk rather than checked in
 # here, following ingenic-lib. 6.9 MB of PROPRIETARY payload in this tree made
 # REDISTRIBUTE = NO untrue: git redistributes it on every clone, which is the
 # thing that flag exists to prevent.
@@ -33,12 +37,12 @@
 #
 ################################################################################
 
-SIGMASTAR_OSDRV_INFINITY6E_SITE_METHOD = git
-SIGMASTAR_OSDRV_INFINITY6E_SITE = https://github.com/johnchia/sigmastar-osdrv
-SIGMASTAR_OSDRV_INFINITY6E_SITE_BRANCH = main
-SIGMASTAR_OSDRV_INFINITY6E_VERSION = f4c94a041796b1d07aeb730702f445c8ba171d41
-SIGMASTAR_OSDRV_INFINITY6E_LICENSE = PROPRIETARY
-SIGMASTAR_OSDRV_INFINITY6E_REDISTRIBUTE = NO
+SIGMASTAR_SDK_INFINITY6E_SITE_METHOD = git
+SIGMASTAR_SDK_INFINITY6E_SITE = https://github.com/johnchia/sigmastar-sdk
+SIGMASTAR_SDK_INFINITY6E_SITE_BRANCH = main
+SIGMASTAR_SDK_INFINITY6E_VERSION = cdfe9e3e8421dc6929d1e55dce22ab54e7556fd4
+SIGMASTAR_SDK_INFINITY6E_LICENSE = PROPRIETARY
+SIGMASTAR_SDK_INFINITY6E_REDISTRIBUTE = NO
 
 # The modules land in a kernel-release directory, so the kernel has to be
 # configured before this package installs -- LINUX_VERSION_PROBED is a $(shell)
@@ -48,33 +52,33 @@ SIGMASTAR_OSDRV_INFINITY6E_REDISTRIBUTE = NO
 # for this vendor, which only names an output directory; the modules need the
 # full "4.9.84" that uname reports, and getting that wrong puts the files
 # somewhere modprobe and load_sigmastar will not look.
-SIGMASTAR_OSDRV_INFINITY6E_DEPENDENCIES = linux
-SIGMASTAR_OSDRV_INFINITY6E_KREL = $(LINUX_VERSION_PROBED)
+SIGMASTAR_SDK_INFINITY6E_DEPENDENCIES = linux
+SIGMASTAR_SDK_INFINITY6E_KREL = $(LINUX_VERSION_PROBED)
 
 # The fetched tree holds one directory per Infinity family, so adding a family
 # to the blob repo needs no change here. Config.sigmastar.in only selects this
 # package when BR2_SOC_FAMILY is "infinity6e", so the two always agree.
-SIGMASTAR_OSDRV_INFINITY6E_BLOBS = $(@D)/$(SOC_FAMILY)
+SIGMASTAR_SDK_INFINITY6E_BLOBS = $(@D)/$(SOC_FAMILY)
 
 # Board-specific tuning, path relative to the BR2_EXTERNAL root as ingenic-sdk
 # reads it. Left unset the stock blob is installed.
 ifneq ($(call qstrip,$(BR2_SENSOR_1_IQ_FILE)),)
-SIGMASTAR_OSDRV_INFINITY6E_IQ_OVERRIDE = \
+SIGMASTAR_SDK_INFINITY6E_IQ_OVERRIDE = \
 	$(BR2_EXTERNAL_THINGINO_PATH)/$(call qstrip,$(BR2_SENSOR_1_IQ_FILE))
 endif
 
-define SIGMASTAR_OSDRV_INFINITY6E_INSTALL_TARGET_CMDS
-	$(INSTALL) -m 755 -d $(TARGET_DIR)/lib/modules/$(SIGMASTAR_OSDRV_INFINITY6E_KREL)/sigmastar
-	$(INSTALL) -m 644 -t $(TARGET_DIR)/lib/modules/$(SIGMASTAR_OSDRV_INFINITY6E_KREL)/sigmastar \
-		$(SIGMASTAR_OSDRV_INFINITY6E_BLOBS)/kmod/*
+define SIGMASTAR_SDK_INFINITY6E_INSTALL_TARGET_CMDS
+	$(INSTALL) -m 755 -d $(TARGET_DIR)/lib/modules/$(SIGMASTAR_SDK_INFINITY6E_KREL)/sigmastar
+	$(INSTALL) -m 644 -t $(TARGET_DIR)/lib/modules/$(SIGMASTAR_SDK_INFINITY6E_KREL)/sigmastar \
+		$(SIGMASTAR_SDK_INFINITY6E_BLOBS)/kmod/*
 
 	$(INSTALL) -m 755 -d $(TARGET_DIR)/usr/lib
 	$(INSTALL) -m 644 -t $(TARGET_DIR)/usr/lib \
-		$(SIGMASTAR_OSDRV_INFINITY6E_BLOBS)/lib/*
+		$(SIGMASTAR_SDK_INFINITY6E_BLOBS)/lib/*
 
 	$(INSTALL) -m 755 -d $(TARGET_DIR)/etc/firmware
 	$(INSTALL) -m 644 -t $(TARGET_DIR)/etc/firmware \
-		$(SIGMASTAR_OSDRV_INFINITY6E_BLOBS)/sensor/firmware/*
+		$(SIGMASTAR_SDK_INFINITY6E_BLOBS)/sensor/firmware/*
 
 	# One sensor per target, in the shape ingenic-sdk installs: the blob under
 	# /usr/share/sensor, an /etc/sensor symlink, and a model file.
@@ -88,13 +92,13 @@ define SIGMASTAR_OSDRV_INFINITY6E_INSTALL_TARGET_CMDS
 	if [ -n "$(SENSOR_1_MODEL)" ]; then \
 		$(INSTALL) -m 755 -d $(TARGET_DIR)/usr/share/sensor; \
 		ln -sf /usr/share/sensor $(TARGET_DIR)/etc/sensor; \
-		if [ -n "$(SIGMASTAR_OSDRV_INFINITY6E_IQ_OVERRIDE)" ] && \
-		   [ -f "$(SIGMASTAR_OSDRV_INFINITY6E_IQ_OVERRIDE)" ]; then \
-			$(INSTALL) -D -m 644 $(SIGMASTAR_OSDRV_INFINITY6E_IQ_OVERRIDE) \
+		if [ -n "$(SIGMASTAR_SDK_INFINITY6E_IQ_OVERRIDE)" ] && \
+		   [ -f "$(SIGMASTAR_SDK_INFINITY6E_IQ_OVERRIDE)" ]; then \
+			$(INSTALL) -D -m 644 $(SIGMASTAR_SDK_INFINITY6E_IQ_OVERRIDE) \
 				$(TARGET_DIR)/usr/share/sensor/$(SENSOR_1_MODEL).bin; \
 		else \
 			$(INSTALL) -D -m 644 \
-				$(SIGMASTAR_OSDRV_INFINITY6E_BLOBS)/sensor/configs/$(SENSOR_1_MODEL).bin \
+				$(SIGMASTAR_SDK_INFINITY6E_BLOBS)/sensor/configs/$(SENSOR_1_MODEL).bin \
 				$(TARGET_DIR)/usr/share/sensor/$(SENSOR_1_MODEL).bin; \
 		fi; \
 		echo $(SENSOR_1_MODEL) > $(TARGET_DIR)/usr/share/sensor/model; \
@@ -102,9 +106,9 @@ define SIGMASTAR_OSDRV_INFINITY6E_INSTALL_TARGET_CMDS
 
 	$(INSTALL) -m 755 -d $(TARGET_DIR)/usr/bin
 	$(INSTALL) -m 755 -t $(TARGET_DIR)/usr/bin \
-		$(SIGMASTAR_OSDRV_INFINITY6E_PKGDIR)/files/script/*
+		$(SIGMASTAR_SDK_INFINITY6E_PKGDIR)/files/script/*
 
-	$(INSTALL) -D -m 755 $(SIGMASTAR_OSDRV_INFINITY6E_PKGDIR)/files/S20sigmastar \
+	$(INSTALL) -D -m 755 $(SIGMASTAR_SDK_INFINITY6E_PKGDIR)/files/S20sigmastar \
 		$(TARGET_DIR)/etc/init.d/S20sigmastar
 endef
 

@@ -1,13 +1,13 @@
-config BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6E
-	bool "sigmastar-osdrv-infinity6e"
+config BR2_PACKAGE_SIGMASTAR_SDK_INFINITY6E
+	bool "sigmastar-sdk-infinity6e"
 	depends on BR2_SOC_VENDOR_SIGMASTAR
-	select BR2_PACKAGE_SIGMASTAR_OSDRV_SENSORS
+	select BR2_PACKAGE_SIGMASTAR_SDK_SENSORS
 	help
 	  SigmaStar Infinity6E vendor MI driver bundle: the mi_* kernel
 	  modules, the MI userspace libraries the Raptor HAL dlopens, the
 	  ISP firmware, and the per-sensor ISP tuning blobs.
 
-	  Ported from OpenIPC's package of the same name. The .ko files are
+	  Ported from OpenIPC's sigmastar-osdrv-infinity6e. The .ko files are
 	  the vendor's, built against Linux 4.9.84, which is why this board
 	  pins that kernel: insmod checks vermagic and a mismatch is fatal.
 

@@ -1,5 +1,5 @@
-config BR2_PACKAGE_SIGMASTAR_OSDRV_SENSORS
-	bool "sigmastar-osdrv-sensors"
+config BR2_PACKAGE_SIGMASTAR_SDK_SENSORS
+	bool "sigmastar-sdk-sensors"
 	depends on BR2_SOC_VENDOR_SIGMASTAR
 	depends on BR2_LINUX_KERNEL
 	help

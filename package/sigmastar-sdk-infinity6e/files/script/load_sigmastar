@@ -2,7 +2,7 @@
 #
 # Insert the SigmaStar MI kernel modules and bind the sensor driver.
 #
-# Ported from OpenIPC (general/package/sigmastar-osdrv-infinity6e). Three
+# Ported from OpenIPC (general/package/sigmastar-sdk-infinity6e). Three
 # deliberate changes from their version:
 #
 #   1. The module directory is derived from `uname -r` rather than hardcoded
