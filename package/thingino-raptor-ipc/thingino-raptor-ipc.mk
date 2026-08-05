@@ -24,7 +24,7 @@ endef
 # raptor-common; pinned to the fork only to keep the four repositories on one
 # branch.
 ifeq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
-THINGINO_RAPTOR_IPC_VERSION = 63607ccedbe5837b325016c665aaf85acaba468e
+THINGINO_RAPTOR_IPC_VERSION = c1c1e44c966f1e04a073afe3df563a81571327e3
 THINGINO_RAPTOR_IPC_SITE = https://github.com/johnchia/raptor-ipc
 endif
 
