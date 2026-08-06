@@ -29,7 +29,7 @@
 BR2_SOC_VENDOR_SIGMASTAR=y
 BR2_SIGMASTAR_SOC_MODEL="ssc30kq"
 
-# Selects which IQ blob sigmastar-sdk-infinity6e installs to
+# Selects which IQ blob sigmastar-sdk installs to
 # /usr/share/sensor. raptor still probes i2c at runtime and binds whichever of
 # the six drivers matches, so a board carrying a different sensor streams
 # normally on the generic /etc/firmware/iqfile0.bin -- the cost is colour, not

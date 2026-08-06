@@ -22,6 +22,10 @@ config BR2_PACKAGE_THINGINO_RAPTOR_HAL_INGENIC
 
 # The MI libraries are dlopened, so the linker never sees them. Without this the
 # daemons build, install, start, and fail at the first HAL call.
+#
+# sigmastar-lib, not sigmastar-sdk: what the HAL needs is the userspace half.
+# The kernel modules come from BR2_THINGINO_SYSTEM_PACKAGES_SIGMASTAR, because a
+# board running a different streamer still needs /dev/mi_* to exist.
 config BR2_PACKAGE_THINGINO_RAPTOR_HAL_SIGMASTAR
 	bool
-	select BR2_PACKAGE_SIGMASTAR_SDK_INFINITY6E
+	select BR2_PACKAGE_SIGMASTAR_LIB

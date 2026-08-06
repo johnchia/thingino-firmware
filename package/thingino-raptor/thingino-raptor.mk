@@ -17,7 +17,7 @@ THINGINO_RAPTOR_DEPENDENCIES += thingino-raptor-hal thingino-raptor-ipc thingino
 # complain, so build order is the only place this can be stated. Without it a
 # parallel build can install the daemons before the MI libraries exist.
 ifeq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
-THINGINO_RAPTOR_DEPENDENCIES += sigmastar-sdk-infinity6e
+THINGINO_RAPTOR_DEPENDENCIES += sigmastar-lib
 else
 THINGINO_RAPTOR_DEPENDENCIES += ingenic-lib
 endif
