@@ -27,20 +27,25 @@ upstream's own toolchain workflow rather than by hand.
 
 ## Building
 
+The producer lives at `configs/github/toolchain_infinity6e_glibc_gcc16_defconfig`,
+alongside the Ingenic ones, which is what puts it in the `toolchain-x86_64`
+matrix. Build it the way the workflow does:
+
 ```sh
-cp board/sigmastar/toolchain/thingino_infinity6e_glibc_gcc16_defconfig \
-   buildroot/configs/
-cd buildroot
-make thingino_infinity6e_glibc_gcc16_defconfig
-make && make sdk
+BOARD=toolchain_infinity6e_glibc_gcc16 GROUP=github make sdk
 ```
 
-Output is `output/images/arm-thingino-linux-gnueabihf_sdk-buildroot.tar.gz`.
-Rename it to the convention the `ext-*.fragment` URLs use — the release tag
-names the build host, the filename names the target — and upload it:
+`GROUP=github` points `CAMERA_SUBDIR` at `configs/github`, and a defconfig with
+no `FRAGMENTS` puts the build in `RAW_DEFCONFIG_MODE` — the defconfig becomes
+the `.config` directly, with no toolchain or SoC fragment layered on.
+
+Output is
+`output/<branch>/toolchain_infinity6e_glibc_gcc16-*/images/arm-thingino-linux-gnueabihf_sdk-buildroot.tar.gz`.
+The workflow renames it to the convention the `ext-*.fragment` URLs use — the
+release tag names the build host, the filename names the target. By hand:
 
 ```sh
-mv output/images/arm-thingino-linux-gnueabihf_sdk-buildroot.tar.gz \
+mv .../images/arm-thingino-linux-gnueabihf_sdk-buildroot.tar.gz \
    thingino-toolchain-x86_64_infinity6e_glibc_gcc16-linux-arm.tar.gz
 gh release upload toolchain-x86_64 thingino-toolchain-*.tar.gz --clobber
 ```
@@ -66,11 +71,22 @@ step is needed here.
 ## Taking this upstream
 
 `toolchain-x86_64.yaml` name-globs `configs/github/*defconfig` for its matrix
-and filters on `gcc16`, so a producer placed in that directory is built and
-published with no workflow change. Two things are still needed first:
+and filters on `gcc16`, so a producer placed in that directory is selected with
+no workflow change. Both prerequisites are now met, and the workflow half is
+the part that touches Ingenic:
 
-- this defconfig gains the wrapper symbols the Ingenic producers carry —
-  `BR2_GLOBAL_PATCH_DIR`, `BR2_THINGINO_TOOLCHAIN_BUILD`, and the rest;
-- the workflow's rename and upload steps stop hardcoding `mipsel`. It locates
-  the SDK with `-name "mipsel-thingino-linux-*_sdk-buildroot.tar.gz"` and names
-  the asset `...-linux-mipsel.tar.gz`, neither of which matches an ARM build.
+- the defconfig carries the wrapper symbols the Ingenic producers carry.
+  `BR2_THINGINO_DEV_PACKAGES` and `BR2_THINGINO_TOOLCHAIN_BUILD` are the
+  load-bearing pair — the second lives inside `if BR2_THINGINO_DEV_PACKAGES`
+  and is dropped without the first, and it is what clears the `default y` on
+  System Packages and Streamer Packages. Without it the producer configures 273
+  packages instead of 140 and tries to build raptor with an Ingenic HAL on ARM.
+- the rename and upload steps derive the architecture instead of hardcoding
+  `mipsel`: the SDK is located with `*-thingino-linux-*_sdk-buildroot.tar.gz`
+  and `TC_ARCH` comes from the tuple's first field, so Ingenic still resolves
+  to `mipsel` and nothing about their assets changes.
+
+Still outstanding: the four checkouts pinned `ref: "master"`, now
+`${{ github.ref_name }}`. On `schedule` that is the default branch, so upstream
+behaviour is unchanged; it is what lets a fork dispatch the workflow from a
+branch and have the matrix see that branch's `configs/github`.

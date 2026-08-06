@@ -14,8 +14,22 @@ BR2_ARM_INSTRUCTIONS_THUMB2=y
 
 BR2_OPTIMIZE_S=y
 
+# Version-keyed, so nothing here applies to gcc 16.1.0 / binutils 2.45.1 -- the
+# only trees are gcc/13, gcc/15.2.0 and binutils/2.44, all Ingenic MXU2. Set
+# for parity with the Ingenic producers.
+BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_THINGINO_PATH)/package/all-patches"
+
 BR2_TOOLCHAIN_BUILDROOT_VENDOR="thingino"
 BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
+
+# Marks this a toolchain build, clearing the default-y on System Packages and
+# Streamer Packages. Without it the producer pulls in the whole firmware -- 273
+# packages, raptor included, with the HAL resolving to Ingenic on an ARM build.
+# TOOLCHAIN_BUILD lives inside "if BR2_THINGINO_DEV_PACKAGES", so it is silently
+# dropped unless that is set too; both lines are required, as on the Ingenic
+# producers.
+BR2_THINGINO_DEV_PACKAGES=y
+BR2_THINGINO_TOOLCHAIN_BUILD=y
 
 # 4.9.84, matching the kernel the board runs.
 #
