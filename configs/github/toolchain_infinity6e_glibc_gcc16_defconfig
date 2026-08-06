@@ -14,9 +14,10 @@ BR2_ARM_INSTRUCTIONS_THUMB2=y
 
 BR2_OPTIMIZE_S=y
 
-# Version-keyed, so nothing here applies to gcc 16.1.0 / binutils 2.45.1 -- the
-# only trees are gcc/13, gcc/15.2.0 and binutils/2.44, all Ingenic MXU2. Set
-# for parity with the Ingenic producers.
+# Set for parity with the Ingenic producers. Since 93533808f this tree does
+# carry gcc/16.1.0 and binutils/2.45.1 patches, so they apply here too, but they
+# are Ingenic MXU2: every file is under gcc/config/mips/ and the one config.gcc
+# hunk is inside the mips*-*-* case, so none of it reaches an ARM compiler.
 BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_THINGINO_PATH)/package/all-patches"
 
 BR2_TOOLCHAIN_BUILDROOT_VENDOR="thingino"
