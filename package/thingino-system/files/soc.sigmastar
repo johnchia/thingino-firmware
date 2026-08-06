@@ -17,16 +17,8 @@
 # /etc/os-release (stamped at build time by scripts/rootfs_script.sh) or from
 # procfs.
 #
-# Camera overlay rather than a package: Makefile:598 appends the camera overlay
-# to BR2_ROOTFS_OVERLAY, and overlays are applied at buildroot/Makefile:809 --
-# after the per-package rsync at :758 and after TARGET_FINALIZE_HOOKS at :759.
-# So this reliably wins over thingino-system's copy. Installing it from a
-# package instead would put it into the same last-writer-wins race that dropped
-# the agent block from /etc/thingino.json, and thingino-system sorts after
-# sigmastar-*, so it would lose.
-#
-# Promote this to a shared SigmaStar overlay when a second SigmaStar board
-# exists. Only the model constant below is board-specific.
+# Only the model constant below is board-specific; everything else is
+# vendor-level and needs no change for a second SigmaStar board.
 
 # Overridable so the parsing can be exercised off-target.
 OS_RELEASE="${OS_RELEASE:-/etc/os-release}"
@@ -36,8 +28,8 @@ os_release_value() {
 	sed -rn "s/^$1=\"?([^\"]*)\"?$/\1/p" "$OS_RELEASE" | head -n1
 }
 
-# Stated here because this overlay is board-scoped by construction. Once the
-# model is stamped into /etc/os-release it can be read like the family below.
+# The one board-specific constant in this file. Once SOC_MODEL is stamped into
+# /etc/os-release it can be read like the family below.
 print_soc_model() {
 	echo "ssc30kq"
 }

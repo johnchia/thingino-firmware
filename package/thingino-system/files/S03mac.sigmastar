@@ -2,15 +2,12 @@
 #
 # Derive the MAC from the SoC die ID.
 #
-# Overrides the shared overlay/etc/init.d/S03mac, which derives a MAC from the
-# Ingenic SoC serial-number registers at 0x13540200-0x1354023C via devmem. That
-# is an Ingenic efuse address; on Infinity6E it is outside the RIU window and
-# there is nothing meaningful to read there. CONFIG_STRICT_DEVMEM is off in this
-# kernel, so the read is not refused -- it either returns zeros (the script's
-# all-zero check then exits cleanly) or it returns garbage, and garbage is the
-# bad case: the shared script only runs when eth.mac is unset and it *persists*
-# what it computes, so one bad read becomes a permanently wrong MAC, and an
-# unstable one means a new DHCP lease on every boot.
+# S03mac.ingenic reads the Ingenic efuse at 0x13540200-0x1354023C via devmem.
+# On Infinity6E that is outside the RIU window, and CONFIG_STRICT_DEVMEM is off
+# so the read is not refused -- it returns zeros or garbage. Garbage is the bad
+# case: the script runs only when eth.mac is unset and it *persists* what it
+# computes, so one bad read becomes a permanently wrong MAC, and an unstable one
+# means a new DHCP lease every boot.
 #
 # The die ID is the only source, deliberately, even though the board ships with
 # an assigned `ethaddr` in the vendor U-Boot environment. A full sysupgrade
