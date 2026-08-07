@@ -46,16 +46,16 @@ FLASH_SIZE_MB=16
 # The asset follows the naming the ext-*.fragment URLs already use -- the
 # release tag names the build host, the filename names the target.
 #
-# Built at upstream's current versions -- GCC 15.3.0, binutils 2.44, glibc 2.43
-# -- so this board tracks the same compiler as the Ingenic targets rather than
-# pinning one of its own. Its sysroot is bare, so nothing here needs
-# package/sigmastar-toolchain-prune.
+# REGRESSION PROBE, NOT FOR MERGE: rolled back to the gcc13 toolchain
+# -- GCC 13.3.0, binutils 2.40, glibc 2.38 -- to bisect a suspected
+# toolchain-update regression. The shipped value is gcc16; see git history.
+# Its sysroot is bare, so nothing here needs package/sigmastar-toolchain-prune.
 BR2_TOOLCHAIN_EXTERNAL_CUSTOM=y
 BR2_TOOLCHAIN_EXTERNAL_DOWNLOAD=y
-BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/johnchia/thingino-firmware/releases/download/toolchain-x86_64/thingino-toolchain-x86_64_infinity6e_glibc_gcc16-linux-arm.tar.gz"
+BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/johnchia/thingino-firmware/releases/download/toolchain-x86_64/thingino-toolchain-x86_64_infinity6e_glibc_gcc13-linux-arm.tar.gz"
 BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX="arm-thingino-linux-gnueabihf"
 BR2_TOOLCHAIN_EXTERNAL_CUSTOM_GLIBC=y
-BR2_TOOLCHAIN_EXTERNAL_GCC_16=y
+BR2_TOOLCHAIN_EXTERNAL_GCC_13=y
 BR2_TOOLCHAIN_EXTERNAL_CXX=y
 # BR2_TOOLCHAIN_EXTERNAL_INET_RPC is not set
 
