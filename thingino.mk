@@ -32,11 +32,10 @@ ifeq ($(SOC_VENDOR),sigmastar)
 # includes as a makefile before this file. Config.soc.in declares the same
 # symbol, so the one defconfig line feeds both this dispatch and Kconfig.
 SOC_MODEL := $(shell echo $(call qstrip,$(BR2_SIGMASTAR_SOC_MODEL)) | tr A-Z a-z)
-# Everything the part number decides, in one place. Ingenic reads the same two
-# facts out of soc_database.txt keyed on the model, which is why neither belongs
-# in the camera defconfig: the DRAM is inside the SoC package, so a board cannot
-# choose it. t31l is 64MB and t31x is 128MB in one family, so this has to be per
-# model rather than per vendor or per family.
+# Everything the part number decides, in one place. Ingenic keys the same two
+# facts on the model, which is why neither belongs in the camera defconfig: the
+# DRAM is inside the SoC package, so a board cannot choose it, and t31l is 64MB
+# against t31x's 128MB within one family.
 #
 # The family map also mirrors BR2_SOC_FAMILY's default chain in Config.soc.in --
 # Kconfig cannot be queried from here, so it is stated in both places, as it
