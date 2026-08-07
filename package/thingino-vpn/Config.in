@@ -16,7 +16,10 @@ config BR2_PACKAGE_THINGINO_VPN_NONE
 config BR2_PACKAGE_THINGINO_VPN_WIREGUARD
 	bool "WireGuard"
 	select BR2_PACKAGE_WIREGUARD_TOOLS
-	select BR2_PACKAGE_WIREGUARD_LINUX_COMPAT if !KERNEL_VERSION_7
+	# The kernel condition matters: select overrides depends on, and this
+	# package's own "depends on BR2_LINUX_KERNEL" would otherwise be forced
+	# past, pulling the versionless linux package into a build with no kernel.
+	select BR2_PACKAGE_WIREGUARD_LINUX_COMPAT if BR2_LINUX_KERNEL && !KERNEL_VERSION_7
 	select BR2_PACKAGE_THINGINO_VPN
 	help
 	  Include WireGuard VPN. Fast, modern, secure VPN tunnel.
