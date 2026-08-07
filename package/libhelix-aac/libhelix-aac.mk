@@ -1,7 +1,7 @@
 LIBHELIX_AAC_SITE_METHOD = git
 LIBHELIX_AAC_SITE = https://github.com/earlephilhower/ESP8266Audio.git
 LIBHELIX_AAC_SITE_BRANCH = master
-LIBHELIX_AAC_VERSION = 74fc1f09bbba5e5c5450b445452ba64ef2d8bbad
+LIBHELIX_AAC_VERSION = 10d929ac01436dfe8856e0a06fd9ec35a848c6e2
 
 LIBHELIX_AAC_INSTALL_STAGING = YES
 LIBHELIX_AAC_INSTALL_TARGET = YES
@@ -9,6 +9,17 @@ LIBHELIX_AAC_INSTALL_TARGET = YES
 LIBHELIX_AAC_SRC_DIR = src/libhelix-aac
 LIBHELIX_AAC_SO_NAME = libhelix-aac.so
 
+# `set -e` is load-bearing. The compile step is a $(foreach ...) whose commands
+# are joined by ";", so without it a source that fails to compile does not stop
+# the loop -- and the link below is "-shared" over whatever .o files happen to
+# exist, which permits undefined symbols. The package then builds green and
+# installs a library that dies at first use:
+#
+#   rwd: symbol lookup error: /lib/libhelix-aac.so: undefined symbol: UncoupleSBRNoise
+#
+# That is what shipped on ARM until 0004-assembly-h-build-on-arm.patch: 15 of
+# the 28 sources hit "#error Unsupported platform in assembly.h" and the
+# resulting .so had 13 objects in it. Fail at build time instead.
 define LIBHELIX_AAC_BUILD_CMDS
 	set -e; $(foreach src,$(wildcard $(@D)/$(LIBHELIX_AAC_SRC_DIR)/*.c), \
 		$(TARGET_CC) $(TARGET_CFLAGS) -I$(@D)/$(LIBHELIX_AAC_SRC_DIR) -fPIC -DUSE_DEFAULT_STDLIB -c $(src) -o $(patsubst %.c, %.o, $(src));)

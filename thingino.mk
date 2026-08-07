@@ -14,25 +14,58 @@ else
 SOC_VENDOR := ingenic
 endif
 
+# Target architecture of the cross toolchain, one line per vendor. It has to be
+# resolved here rather than read from the BR2_mipsel/BR2_arm the SoC fragment
+# already sets: fragments are appended to .config and never included as
+# makefiles, so that symbol is not readable when SED_CONFIG_VARS runs.
+ifeq ($(SOC_VENDOR),sigmastar)
+SOC_TARGET_ARCH := arm
+else
+SOC_TARGET_ARCH := mipsel
+endif
+
+# One block per vendor, and all each one does is name the Kconfig symbol its
+# model comes from. Everything the part number then decides is looked up the
+# same way for every vendor, below.
+ifeq ($(SOC_VENDOR),sigmastar)
+
+# BR2_SIGMASTAR_SOC_MODEL comes from the camera defconfig, which board.mk
+# includes as a makefile before this file. Config.soc.in declares the same
+# symbol, so the one defconfig line feeds both this dispatch and Kconfig.
+SOC_MODEL := $(shell echo $(call qstrip,$(BR2_SIGMASTAR_SOC_MODEL)) | tr A-Z a-z)
+# Names the output directory, and keeps the Ingenic default chain below -- which
+# is guarded on an empty KERNEL_VERSION -- from claiming this vendor. The kernel
+# source is named in core-sigmastar.fragment, not through KERNEL_SITE/BRANCH.
+KERNEL_VERSION := 4.9
+
+else
+
 # Get SoC model from BR2_INGENIC_SOC_MODEL (single source of truth)
 SOC_MODEL_INPUT := $(call qstrip,$(BR2_INGENIC_SOC_MODEL))
 ifneq ($(SOC_MODEL_INPUT),)
-	# Database-driven approach
-	SOC_MODEL := $(shell echo $(SOC_MODEL_INPUT) | tr A-Z a-z)
+SOC_MODEL := $(shell echo $(SOC_MODEL_INPUT) | tr A-Z a-z)
+endif
 
-	# Query database for SoC parameters
-	SOC_FAMILY := $(shell $(BR2_EXTERNAL)/scripts/get_soc_params.sh $(SOC_MODEL) family 2>/dev/null || echo "unknown")
-	SOC_RAM_MB := $(shell $(BR2_EXTERNAL)/scripts/get_soc_params.sh $(SOC_MODEL) ram 2>/dev/null || echo "64")
-	SOC_ARCH := xburst$(shell $(BR2_EXTERNAL)/scripts/get_soc_params.sh $(SOC_MODEL) arch 2>/dev/null || echo "1")
+endif # SOC_VENDOR
 
-	# Special case: C100 family handling
-	ifeq ($(SOC_MODEL),c100)
-		ifeq ($(KERNEL_VERSION),4.4.94)
-			SOC_FAMILY := c100
-		else
-			SOC_FAMILY := t31
-		endif
-	endif
+# One file per SoC family under soc/<vendor>/. Each sets SOC_FAMILY, SOC_ARCH,
+# SOC_RAM_MB and, where the vendor uses BR2_TARGET_UBOOT, SOC_UBOOT_NOR /
+# SOC_UBOOT_NAND / SOC_UBOOT_BIN. Anything a SoC does not have, it does not set
+# -- consumers below use $(or ...) for the fallback.
+#
+# All of them are included and each opens with a $(filter) on its own models, so
+# only one file's body applies. The family cannot pick the filename, because the
+# family is one of the things being looked up.
+ifneq ($(SOC_MODEL),)
+include $(wildcard $(BR2_EXTERNAL)/soc/$(SOC_VENDOR)/*.mk)
+
+# A model no family claims leaves SOC_FAMILY empty, which is worth stopping for:
+# the old lookup fell back to "unknown"/64 and built something wrong. Unindented
+# because a tab-led $(error ...) is not a directive -- make reads it as a recipe
+# and fails with "recipe commences before first target" instead.
+ifeq ($(SOC_FAMILY),)
+$(error Unknown $(SOC_VENDOR) SoC model '$(SOC_MODEL)': no soc/$(SOC_VENDOR)/*.mk claims it)
+endif
 endif
 
 SOC_FAMILY_CAPS := $(shell echo $(SOC_FAMILY) | tr a-z A-Z)
@@ -45,6 +78,7 @@ export SOC_MODEL
 export SOC_MODEL_LESS_Z
 export SOC_RAM_MB
 export SOC_ARCH
+export SOC_TARGET_ARCH
 
 #
 # KERNEL
@@ -66,6 +100,12 @@ ifeq ($(KERNEL_VERSION),)
 		KERNEL_VERSION := 3.10.14
 	endif
 endif
+
+# Only the Ingenic path maps SOC_FAMILY onto a kernel branch. Other vendors name
+# their source in their core fragment, so there is nothing here to resolve --
+# and the git ls-remote below would otherwise run on every make for a value that
+# vendor never reads.
+ifeq ($(SOC_VENDOR),ingenic)
 
 KERNEL_SITE := https://github.com/gtxaspec/thingino-linux
 
@@ -114,6 +154,8 @@ ifeq ($(KERNEL_HASH),)
 	KERNEL_HASH := $(shell git ls-remote $(KERNEL_SITE) $(KERNEL_BRANCH) | head -1 | cut -f1)
 endif
 KERNEL_TARBALL_URL := $(KERNEL_SITE)/archive/$(KERNEL_HASH).tar.gz
+
+endif # SOC_VENDOR = ingenic
 
 ifeq ($(KERNEL_VERSION),7.1-rc1)
 KERNEL_VERSION_7 := y
@@ -594,11 +636,13 @@ export FLASH_SIZE_MB
 #
 
 ifeq ($(BR2_TARGET_UBOOT_BOARDNAME),)
-	# Get U-Boot board name based on flash type
+	# Get U-Boot board name based on flash type. A SoC with no separate NAND
+	# board falls back to its NOR one, which is what the "-" in the old
+	# database meant.
 	ifeq ($(BR2_THINGINO_FLASH_NAND),y)
-		UBOOT_BOARDNAME := $(shell $(BR2_EXTERNAL)/scripts/get_soc_params.sh $(SOC_MODEL) uboot nand 2>/dev/null || echo "unknown")
+		UBOOT_BOARDNAME := $(or $(SOC_UBOOT_NAND),$(SOC_UBOOT_NOR),unknown)
 	else
-		UBOOT_BOARDNAME := $(shell $(BR2_EXTERNAL)/scripts/get_soc_params.sh $(SOC_MODEL) uboot nor 2>/dev/null || echo "unknown")
+		UBOOT_BOARDNAME := $(or $(SOC_UBOOT_NOR),unknown)
 	endif
 	BR2_TARGET_UBOOT_BOARDNAME := $(UBOOT_BOARDNAME)
 endif
@@ -653,7 +697,11 @@ ifeq ($(BR2_TARGET_UBOOT_FORMAT_CUSTOM_NAME),)
 endif
 
 ifeq ($(BR2_TARGET_UBOOT_BOARD_DEFCONFIG),)
-UBOOT_DEFCONFIG := $(shell $(BR2_EXTERNAL)/scripts/get_soc_params.sh $(SOC_MODEL) uboot $(UBOOT_BOARD_FLASH) 2>/dev/null || echo "unsupported-$(SOC_MODEL)")
+ifeq ($(UBOOT_BOARD_FLASH),nand)
+UBOOT_DEFCONFIG := $(or $(SOC_UBOOT_NAND),$(SOC_UBOOT_NOR),unsupported-$(SOC_MODEL))
+else
+UBOOT_DEFCONFIG := $(or $(SOC_UBOOT_NOR),unsupported-$(SOC_MODEL))
+endif
 BR2_TARGET_UBOOT_BOARD_DEFCONFIG := $(UBOOT_DEFCONFIG)
 endif
 

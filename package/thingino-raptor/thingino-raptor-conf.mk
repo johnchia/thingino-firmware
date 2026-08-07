@@ -4,6 +4,33 @@
 # String settings: non-empty BR2 value -> uncomment and set in raptor.conf
 # Bool settings: _TRUE/_FALSE choice -> set true/false, _DEFAULT -> leave as-is
 
+# rset's range ends at the next section header, COMMENTED OR NOT.
+#
+# raptor.conf documents multi-sensor boards with commented example sections --
+# "# [sensor0]", "# [sensor1_stream0]", "# [sensor1_image]" -- placed
+# immediately after the real section they mirror. Ending the range at /^\[/
+# steps straight over those, because their headers begin with "#" rather than
+# "[", and the substitution then rewrites the example keys as well: it matches
+# "^[# ]*<key> = ", so it uncomments them.
+#
+# Setting stream1 width therefore produced three uncommented "width = 640"
+# lines -- the real one, plus one inside each of the two commented example
+# blocks that follow it. Those blocks' own headers stay commented, so an INI
+# parser reads the strays as part of [stream1]: a section with duplicate keys,
+# correct only for as long as last-one-wins keeps them harmless.
+#
+# Stopping at a commented header is safe in every section here, because the
+# convention throughout the file is real keys first and commented examples
+# last -- so it stops exactly where the real section's content ends.
+#
+# NB: this comment lives outside the define deliberately. Every line of
+# THINGINO_RAPTOR_PATCH_CONF ends in a backslash because the whole body has to
+# run as ONE shell invocation -- CONF is set on the first line and used by
+# rset on the last. A comment line inserted into the body has no backslash,
+# breaks the chain, and splits it into separate shells; CONF is then unset,
+# sed silently rewrites nothing, and "|| true" hides it. The symptom is an
+# entirely unpatched raptor.conf and a successful build.
+
 # Helper: map bool choice to "true", "false", or "" (default = don't touch)
 raptor_bval = $(if $(filter y,$(BR2_PACKAGE_THINGINO_RAPTOR_CONF_$(1)_TRUE)),true,$(if $(filter y,$(BR2_PACKAGE_THINGINO_RAPTOR_CONF_$(1)_FALSE)),false,))
 
@@ -11,7 +38,7 @@ define THINGINO_RAPTOR_PATCH_CONF
 	CONF=$(TARGET_DIR)/etc/raptor.conf; \
 	rset() { \
 		[ -n "$$3" ] && \
-		sed -i "/^\[$$1\]/,/^\[/{s|^[# ]*$$2 = .*|$$2 = $$3|;}" "$$CONF" || true; \
+		sed -i "/^\[$$1\]/,/^[# ]*\[/{s|^[# ]*$$2 = .*|$$2 = $$3|;}" "$$CONF" || true; \
 	}; \
 	\
 	if [ "$(BR2_THINGINO_IMAGE_SENSOR_QTY)" -gt 1 ] 2>/dev/null; then \

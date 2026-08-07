@@ -1,0 +1,300 @@
+# NAME: Unbranded SSC30KQ (Infinity6E, GC4653)
+#
+# Named per thingino's convention <brand>_[model_]<soc>_<sensor>[_<wifi>], where
+# the wifi field is optional (cf. hamedal_c20_t31a_gc2053) and the model field
+# may be omitted for unbranded hardware (cf. noname_t10l_jxh42_mt7601). "noname"
+# is thingino's established token for unbranded boards.
+#
+# Was openipc_ssc30kq_raptor, which was wrong twice over: it put "openipc" in
+# the brand slot, when OpenIPC is the firmware being replaced rather than the
+# hardware vendor, and "raptor" in the sensor slot, when raptor is a streamer
+# and not silicon. It also leaked into the hostname -- scripts/rootfs_script.sh
+# builds it from the first two underscore fields, giving ing-openipc-ssc30kq.
+# This name gives ing-noname-ssc30kq.
+#
+# The sensor belongs in the target name because thingino ships one target per
+# silicon combination (cf. the eight tplink_tapo variants).
+# FRAG: soc-infinity6e core-sigmastar ssl-mbedtls
+
+# board.mk includes this file as a makefile before thingino.mk runs, so all
+# three are readable there as plain make variables and drive SOC_VENDOR /
+# SOC_MODEL / SOC_FAMILY / SOC_ARCH.
+#
+# The vendor has to be declared here and not only in soc-infinity6e.fragment:
+# fragments are appended to .config, never included as makefiles, so a symbol
+# set only in a fragment is invisible to thingino.mk's vendor dispatch.
+#
+# The family is not set here: Config.soc.in derives BR2_SOC_FAMILY from the
+# model, and thingino.mk maps the same model for the make side.
+BR2_SOC_VENDOR_SIGMASTAR=y
+BR2_SIGMASTAR_SOC_MODEL="ssc30kq"
+
+# Selects which IQ blob sigmastar-sdk installs to
+# /usr/share/sensor. raptor still probes i2c at runtime and binds whichever of
+# the six drivers matches, so a board carrying a different sensor streams
+# normally on the generic /etc/firmware/iqfile0.bin -- the cost is colour, not
+# function. BR2_SENSOR_1_IQ_FILE overrides the blob with a board-specific one.
+BR2_SENSOR_1_NAME="gc4653"
+
+FLASH_SIZE_MB=16
+
+# The toolchain fragment is resolved by name from TYPE/GCC/LIBC only
+# (Makefile:185) and has no architecture in it, so the file that gets appended
+# is always thingino's mipsel toolchain. Re-point it here: the camera defconfig
+# is appended after the fragments (Makefile:591), so these win.
+#
+# The asset follows the naming the ext-*.fragment URLs already use -- the
+# release tag names the build host, the filename names the target.
+#
+# Built at upstream's current versions -- GCC 15.3.0, binutils 2.44, glibc 2.43
+# -- so this board tracks the same compiler as the Ingenic targets rather than
+# pinning one of its own. Its sysroot is bare, so nothing here needs
+# package/sigmastar-toolchain-prune.
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM=y
+BR2_TOOLCHAIN_EXTERNAL_DOWNLOAD=y
+BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/johnchia/thingino-firmware/releases/download/toolchain-x86_64/thingino-toolchain-x86_64_infinity6e_glibc_gcc16-linux-arm.tar.gz"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX="arm-thingino-linux-gnueabihf"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_GLIBC=y
+BR2_TOOLCHAIN_EXTERNAL_GCC_16=y
+BR2_TOOLCHAIN_EXTERNAL_CXX=y
+# BR2_TOOLCHAIN_EXTERNAL_INET_RPC is not set
+
+# Same reason: Makefile:580-588 appends 3.10 or 4.4 headers unconditionally
+# from the Ingenic KERNEL_VERSION, and runs before this file is appended. The
+# ARM toolchain named above is built against 4.9 headers.
+BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
+
+# Vendor U-Boot stays on the chip, so there is no uenv.txt and no full-chip
+# image. Everything below is dictated by the bootargs already in the vendor
+# U-Boot environment, read from the running device:
+#
+#   console=ttyS0,115200 panic=20 root=/dev/mtdblock3 init=/init
+#   mtdparts=NOR_FLASH:256k(boot),64k(env),2048k(kernel),5120k(rootfs),-(rootfs_data)
+#   LX_MEM=0xFFE0000 mma_heap=mma_heap_name0,miu=0,sz=0x9E9C000 cma=2M
+#
+# Four things there are load-bearing and none of them are ours to set:
+#
+#   init=/init         - thingino's overlay init runs, so /etc is writable via
+#                        an overlayfs on rootfs_data. Without this the rootfs
+#                        would be read-only squashfs.
+#   root=/dev/mtdblock3  - rootfs.squashfs must be flashed to mtd3, uImage to
+#                        mtd2. Confirm indices from /proc/mtd, not from here.
+#   mtdparts=...       - the partition table comes from the cmdline, not the
+#                        device tree (CONFIG_MTD_CMDLINE_PARTS=y,
+#                        CONFIG_MTD_OF_PARTS unset), and it is not derivable
+#                        from the 16MB flash size.
+#   console=ttyS0      - inittab respawns getty on /dev/console, which resolves
+#                        through this.
+#
+# The line above is the *expansion* from one particular boot. The env holds the
+# rootfs size as a variable:
+#
+#   mtdparts=NOR_FLASH:256k(boot),64k(env),2048k(kernel),${rootmtd}(rootfs),-(rootfs_data)
+#
+# but ${rootmtd} is not read from the stored environment and cannot be set.
+# OpenIPC's U-Boot re-derives it on every boot in cmd_sf.c's `sf probe`, from
+# the squashfs superblock at the rootfs offset: under ~4.996MB it picks 5120k,
+# over it 8192k. bootcmd runs `sf probe 0` before ${rootmtd} is expanded, so
+# `fw_setenv rootmtd` can never take effect on any unit, and a stored 8192k is
+# a fossil from a first boot that ran `sf probe 0; saveenv`.
+#
+# So the partition auto-sizes to the image and needs no management here. Phase
+# 2's SDK payload pushes the image past the threshold; it gets the 8192KB
+# partition on its own. Two things follow: mtd4's offset MOVES when that
+# happens, so erase the overlay after the resize boot rather than before, and
+# `fw_printenv rootmtd` is not authoritative for anything. Read the image size,
+# or /proc/cmdline after a boot.
+#
+# ssc30kq-post-image.sh mirrors that arithmetic instead of hardcoding a limit,
+# and carries the note about retiring the whole mechanism when we build our own
+# U-Boot.
+#
+# panic=20 is a useful safety net during bring-up: a failed boot reboots after
+# 20s rather than hanging, so vendor U-Boot is always reachable again.
+BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/infinity6e/ssc30kq-post-image.sh"
+
+# The device type has to be stated. BR2_THINGINO_DEV_CAMERA is a hidden helper
+# (Config.soc.in:925) that gates the entire camera stack -- the streamer
+# choice, ONVIF, the ISP modules -- and it is only set by DEV_IPCAM or
+# DEV_WEBCAM. Leave the type unset and the streamer choice quietly defaults
+# back to None with nothing in the build log to say why.
+BR2_THINGINO_DEV_IPCAM=y
+
+# raptor's vendor libraries hang off thingino-raptor-hal's per-vendor backend
+# symbol, so selecting Raptor here takes the SigmaStar backend rather than
+# dragging MIPS vendor blobs into an ARM rootfs.
+BR2_PACKAGE_THINGINO_STREAMER_RAPTOR=y
+
+# Builds the NOR boot image into images/ and installs nothing to the target, so
+# the board keeps booting the OEM bootloader. Built on every build rather than
+# first attempted on the day it is needed: BOOT.bin sits at 95% of the OEM 256KB
+# boot partition, which is worth watching before it is worth flashing.
+BR2_PACKAGE_SIGMASTAR_UBOOT=y
+
+# Daemon selection: the set OpenIPC's ssc30kq_raptor target actually brought
+# up on this silicon (rvd/rsd/rad/rod/ric), plus rhd.
+#
+# NOT the FULL set, and the reason is the build rather than the runtime. This
+# is the first time any of this code is compiled for ARM; rmr, rmd, rwd, rsp
+# and rsr have only ever been built against MIPS, and a daemon that fails to
+# compile fails the whole firmware build, turning an unrelated regression into
+# a phase-2 blocker. They come back on one at a time, each with its own build.
+#
+# rwd came back in phase 4 (see the _WEBRTC block below) -- the live preview
+# needs it. Still deferred: rmr, rmd, rsp, rsr.
+#
+# rhd is in despite not being in OpenIPC's set because it links only LIB_IPC
+# and LIB_COMMON -- no HAL, so nothing about it is platform-specific -- and
+# phase 4's web UI wants HTTP snapshots.
+#
+# rac is unset explicitly: its default is "y if RAD", so dropping FULL does not
+# drop it.
+# BR2_PACKAGE_THINGINO_RAPTOR_FULL is not set
+BR2_PACKAGE_THINGINO_RAPTOR_RVD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RSD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RAD=y
+BR2_PACKAGE_THINGINO_RAPTOR_ROD=y
+BR2_PACKAGE_THINGINO_RAPTOR_RIC=y
+BR2_PACKAGE_THINGINO_RAPTOR_RHD=y
+# BR2_PACKAGE_THINGINO_RAPTOR_RAC is not set
+
+# RWD, the WebRTC/WHIP server -- the first of the five deferred daemons to come
+# back, because the web UI's live preview is WebRTC and nothing else provides
+# it. var/www/x/webrtc-whip.cgi proxies to https://127.0.0.1:8554/whip and
+# returns 502 {"error":"backend_unreachable"} when no daemon is listening,
+# which is exactly what a browser saw with rwd absent.
+#
+# No [webrtc] settings needed: the shipped defaults already match the proxy
+# (http_port 8554, https true) and the cert/key point at uhttpd's, so signalling
+# reuses the certificate the browser has already accepted.
+#
+# Note the symbol is _WEBRTC, not _RWD like its siblings. It depends on
+# _RAPTOR_TLS (already on) and selects BR2_PACKAGE_MBEDTLS_DTLS_SRTP, so
+# enabling it rebuilds mbedTLS with DTLS-SRTP.
+BR2_PACKAGE_THINGINO_RAPTOR_WEBRTC=y
+
+# Stream geometry and the sensor settings this board was brought up with.
+#
+# These are NOT optional decoration. The raptor package installs the generic
+# config/raptor.conf, in which every one of these keys is commented out, and
+# rvd's own fallback for a missing stream0 width is 1920 -- so leaving this
+# block out does not produce "the sensor's native resolution", it produces a
+# silent 1920x1080 at 25fps from a 2560x1440 sensor.
+#
+# The values come from config/raptor-ssc30kq.conf in the raptor fork, which is
+# the file this hardware was actually brought up against. They are set through
+# thingino's own Kconfig knobs rather than by installing that file, because on
+# thingino the two things it carries have better homes: geometry belongs here,
+# where a reader looking at the board looks, and its IR-cut GPIO pins are set
+# below in the [ircut] section.
+#
+# The pins were originally left out of here and put ONLY in thingino.json, on
+# the reasoning that ric auto-discovers them from that file. It does
+# (ric/ric_main.c:411 load_gpio_from_thingino_json) -- but that path reads
+# /etc/thingino.json into a fixed 2048-byte buffer, and thingino's assembled
+# config is 2727 bytes on this board. fread truncates mid-structure,
+# cJSON_Parse returns NULL, and ric returns silently by design, because a
+# missing thingino.json is the normal case on OpenIPC and warning about it
+# every boot would be noise. The pins stayed -1, ric never exported or drove
+# the GPIOs, the IR-cut filter never engaged, and the stream came back with a
+# magenta cast in daylight -- with nothing in any log to say why.
+#
+# So set them HERE. raptor.conf's [ircut] is the authoritative source, is
+# consulted first, and short-circuits the JSON discovery entirely: with
+# gpio_ircut, gpio_irled and gpio_irled2 all >= 0, load_gpio_from_thingino_json
+# returns at its first guard without opening the file. thingino.json keeps its
+# gpio block as well -- it costs nothing, it is where other thingino consumers
+# look, and it is correct once ric's buffer is fixed -- but nothing depends on
+# it being read any more.
+#
+# The patcher (thingino-raptor-conf.mk) rewrites commented keys in place, so
+# setting a value here both uncomments and sets it. Keys left empty are skipped
+# entirely, which is why the rest of raptor.conf is untouched.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_WIDTH="2560"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_HEIGHT="1440"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_FPS="30"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_CODEC="h264"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_PROFILE="2"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_BITRATE="4000000"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_RC_MODE="cbr"
+# 2 seconds at 30fps.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_GOP="60"
+# JPEG on, for the snapshot path. It was off through phases 2-3 on the grounds
+# that MJPEG was unverified on this silicon and shipping an unexercised snapshot
+# path was worse than not having one. Phase 4 is where it gets exercised: rhd
+# serves /x/ch0.jpg and /x/ch0.mjpg, which the web UI offers as endpoints and
+# which ONVIF and the HA integration use for stills. Turning it on is the point
+# at which "unverified" becomes testable rather than permanent.
+#
+# This is NOT what drives the live preview -- that is WebRTC through rwd, above.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM0_JPEG_TRUE=y
+
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_ENABLED_TRUE=y
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_WIDTH="640"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_HEIGHT="360"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_FPS="5"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_CODEC="h264"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_PROFILE="2"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_BITRATE="1000000"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_RC_MODE="cbr"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_GOP="30"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_OSD_ENABLED_FALSE=y
+# Sub-stream snapshots too: at 640x360 the encode is cheap, and it gives the
+# UI and ONVIF a low-cost still that does not tie up the 2560x1440 encoder.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_STREAM1_JPEG_TRUE=y
+
+# 50Hz mains. antiflicker is the ISP's flicker-avoidance mode, not a boolean.
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_SENSOR_ANTIFLICKER="2"
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_SENSOR_LOW_LATENCY_FALSE=y
+BR2_PACKAGE_THINGINO_RAPTOR_CONF_RING_REFMODE_FALSE=y
+
+# [ircut] carries no gpio_* pins on purpose. They live in this camera's
+# thingino.json, which is where GPIO assignments belong on thingino -- one
+# place per board, read by ric and by anything else that needs them, rather
+# than duplicated into a streamer's own config.
+#
+# They were briefly set here instead, as a way around ric reading
+# /etc/thingino.json through a fixed 2047-byte buffer and silently failing to
+# parse our 2727-byte file. That is fixed upstream in raptor 4684315 -- the
+# read is sized from fstat, bounded at 64KB, and a file that exists but does
+# not parse now warns instead of returning silently -- so the workaround is
+# reverted and thingino.json is authoritative again.
+#
+# raptor.conf's [ircut] still WINS if any gpio_* is set here: ric consults it
+# first and only fills in what it left at -1 (ric/ric_main.c). Leaving these
+# unset is what hands the decision to thingino.json. If a future board needs
+# to override just one pin, setting it here is the supported way.
+#
+# Pin order is polarity and is VERIFIED on hardware (2026-07-28) -- see the
+# note in thingino.json.
+
+# [image] is deliberately left entirely at defaults, and that is a decision
+# rather than an omission. load_sigmastar hands the ISP the tuned
+# /etc/sensors/<sensor>.bin, which replaces the generic iqfile0.bin CUS3A would
+# otherwise pick up. With a tuned file in effect the right thing for the image
+# knobs to do is nothing: the backend treats a knob left at its neutral 128 as
+# "leave this module on auto", so the tuning file's own curves stay in charge.
+# Setting one switches that module to manual and pins it -- useful for a
+# deliberate adjustment, counterproductive as a default.
+
+BR2_PACKAGE_DROPBEAR=y
+
+# Build zlib for the target rather than linking the toolchain's bundled copy.
+#
+# The OpenIPC toolchain sysroot ships libz.so.1.3.1, so -lz resolves at link
+# time and libcurl comes out with DT_NEEDED libz.so.1. But Buildroot's
+# toolchain-external only copies a fixed set of runtime libraries into the
+# target (libc, libm, libgcc_s, libstdc++ ...) -- it does not ship arbitrary
+# libraries bundled in a vendor sysroot. So libz.so.1 was never in the rootfs
+# and /usr/bin/curl could not start. telegrambot reaches it through libcurl and
+# broke the same way.
+#
+# Selecting it here makes Buildroot build and install a real target zlib, and
+# turns on the libz block that sigmastar-toolchain-prune already had waiting, so
+# the toolchain's copy stops shadowing it in staging.
+#
+# BR2_TOOLCHAIN_EXTRA_LIBS="libz" would also have worked -- that is Buildroot's
+# supported hook for this exact toolchain shape (pkg-toolchain-external.mk:176)
+# -- but it would ship a prebuilt blob that the prune is simultaneously trying
+# to delete. Building it is the option that keeps one owner per library.
+BR2_PACKAGE_ZLIB=y

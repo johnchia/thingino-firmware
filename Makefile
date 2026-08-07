@@ -235,7 +235,7 @@ endif
 # Capped XBurst1 SoCs (T10/T20/T21/T30) boot a TPL chain with modern u-boot; allow legacy names
 ifneq ($(THINGINO_UBOOT_VERSION_TAG),2013-07)
 ifneq ($(SOC_MODEL),)
-UBOOT_BIN_NAME := $(shell $(SCRIPTS_DIR)/get_soc_params.sh $(SOC_MODEL) uboot_image 2>/dev/null || echo u-boot-with-spl-lzma.bin)
+UBOOT_BIN_NAME := $(or $(SOC_UBOOT_BIN),u-boot-with-spl-lzma.bin)
 endif
 endif
 
@@ -258,6 +258,7 @@ NPROC := $(shell nproc)
 SED_CONFIG_VARS = sed \
 	's/\$$[(]BR2_HOSTARCH[)]/$(BR2_HOSTARCH)/g; \
 	 s/\$$[(]SOC_ARCH[)]/$(SOC_ARCH)/g; \
+	 s/\$$[(]SOC_TARGET_ARCH[)]/$(SOC_TARGET_ARCH)/g; \
 	 s/\$$[(]TOOLCHAIN_SOC_TAG[)]/$(TOOLCHAIN_SOC_TAG)/g; \
 	 s/\$$[(]SOC_MODEL[)]/$(SOC_MODEL)/g; \
 	 s/\$$[(]SOC_FAMILY[)]/$(SOC_FAMILY)/g; \
@@ -590,8 +591,13 @@ else
 	# add camera configuration
 	$(SED_CONFIG_VARS) $(CAMERA_CONFIG_REAL) >>$(OUTPUT_DIR)/.config
 	# add SOC-derived values
+	#
+	# Only BR2_SOC_RAM_MB. BR2_SOC_FAMILY was written here too, and the value
+	# never survived: it has no prompt, and Kconfig recomputes an unprompted
+	# symbol from its defaults rather than honouring what is in .config. Its
+	# value comes from the default chain in Config.soc.in and always did.
+	# BR2_SOC_RAM_MB does survive because it is prompted.
 	@echo "# SOC-derived configuration" >>$(OUTPUT_DIR)/.config
-	@echo 'BR2_SOC_FAMILY="$(SOC_FAMILY)"' >>$(OUTPUT_DIR)/.config
 	@echo 'BR2_SOC_RAM_MB=$(SOC_RAM_MB)' >>$(OUTPUT_DIR)/.config
 	@echo >>$(OUTPUT_DIR)/.config
 	# append camera-specific overlay if it exists

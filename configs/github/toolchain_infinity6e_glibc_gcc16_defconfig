@@ -1,0 +1,53 @@
+# Toolchain producer for SigmaStar Infinity6E (ARMv7 cortex-a7, hard float).
+#
+# This is a BUILDROOT defconfig, not a thingino camera defconfig. It builds
+# against the pinned submodule: that is where gcc 16.1.0 and binutils 2.45.1
+# come from, and they are the exact versions
+# configs/github/toolchain_*_gcc16_defconfig selects for every Ingenic
+# toolchain. Matching them is what lets this producer run in upstream's own
+# toolchain workflow.
+BR2_arm=y
+BR2_cortex_a7=y
+BR2_ARM_EABIHF=y
+BR2_ARM_FPU_NEON_VFPV4=y
+BR2_ARM_INSTRUCTIONS_THUMB2=y
+
+BR2_OPTIMIZE_S=y
+
+# Set for parity with the Ingenic producers. Since 93533808f this tree does
+# carry gcc/16.1.0 and binutils/2.45.1 patches, so they apply here too, but they
+# are Ingenic MXU2: every file is under gcc/config/mips/ and the one config.gcc
+# hunk is inside the mips*-*-* case, so none of it reaches an ARM compiler.
+BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_THINGINO_PATH)/package/all-patches"
+
+BR2_TOOLCHAIN_BUILDROOT_VENDOR="thingino"
+BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
+
+# Marks this a toolchain build, clearing the default-y on System Packages and
+# Streamer Packages. Without it the producer pulls in the whole firmware -- 273
+# packages, raptor included, with the HAL resolving to Ingenic on an ARM build.
+# TOOLCHAIN_BUILD lives inside "if BR2_THINGINO_DEV_PACKAGES", so it is silently
+# dropped unless that is set too; both lines are required, as on the Ingenic
+# producers.
+BR2_THINGINO_DEV_PACKAGES=y
+BR2_THINGINO_TOOLCHAIN_BUILD=y
+
+# 4.9.84, matching the kernel the board runs.
+#
+# All three lines are required. The "Kernel Headers" choice offers nothing
+# older than 4.19, so 4.9 is only reachable through the manually-specified
+# path: BR2_KERNEL_HEADERS_VERSION opens it, BR2_DEFAULT_KERNEL_VERSION gives
+# the version, and CUSTOM_4_9 tells Buildroot which series that is. Setting
+# CUSTOM_4_9 alone is silently ignored and the default headers win, which the
+# toolchain build does not complain about -- it surfaces much later as
+# "Incorrect selection of kernel headers" when a camera tries to consume it.
+BR2_KERNEL_HEADERS_VERSION=y
+BR2_DEFAULT_KERNEL_VERSION="4.9.84"
+BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_4_9=y
+
+BR2_BINUTILS_VERSION_2_45_X=y
+BR2_GCC_VERSION_16_X=y
+BR2_TOOLCHAIN_BUILDROOT_CXX=y
+
+BR2_CCACHE=y
+BR2_CCACHE_USE_BASEDIR=y

@@ -20,4 +20,12 @@ define THINGINO_RAPTOR_IPC_INSTALL_TARGET_CMDS
 		$(TARGET_DIR)/usr/lib/librss_ipc.so
 endef
 
+# See the matching block in thingino-raptor.mk. Architecture-neutral like
+# raptor-common; pinned to the fork only to keep the four repositories on one
+# branch.
+ifeq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
+THINGINO_RAPTOR_IPC_VERSION = 7a3993c7f6c4c647e1f82dc211be2641dac1913f
+THINGINO_RAPTOR_IPC_SITE = https://github.com/johnchia/raptor-ipc
+endif
+
 $(eval $(generic-package))

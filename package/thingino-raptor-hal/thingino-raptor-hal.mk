@@ -5,7 +5,12 @@ THINGINO_RAPTOR_HAL_GIT_SUBMODULES = YES
 THINGINO_RAPTOR_HAL_INSTALL_STAGING = YES
 THINGINO_RAPTOR_HAL_INSTALL_TARGET = NO
 
+# One block per vendor, matching the backend symbols in Config.in. A vendor
+# whose backend links no library adds no block here, which also leaves
+# INGENIC_HEADERS below inert rather than needing a guard of its own.
+ifeq ($(BR2_SOC_VENDOR_INGENIC),y)
 THINGINO_RAPTOR_HAL_DEPENDENCIES = ingenic-lib
+endif
 
 THINGINO_RAPTOR_HAL_PLATFORM = $(shell echo $(SOC_FAMILY) | tr a-z A-Z)
 
@@ -29,5 +34,12 @@ define THINGINO_RAPTOR_HAL_INSTALL_STAGING_CMDS
 	$(INSTALL) -D -m 0644 $(@D)/include/raptor_hal.h \
 		$(STAGING_DIR)/usr/include/raptor_hal.h
 endef
+
+# See the matching block in thingino-raptor.mk for why the SigmaStar source
+# override lives at the bottom of the file rather than beside the pinned hash.
+ifeq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
+THINGINO_RAPTOR_HAL_VERSION = ec06aac63ad346bce1472adbf4dedac5a346dcc8
+THINGINO_RAPTOR_HAL_SITE = https://github.com/johnchia/raptor-hal
+endif
 
 $(eval $(generic-package))
