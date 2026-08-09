@@ -57,11 +57,14 @@ BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="d85ef37e8ed2367db6b4b9a58d959d598d5cc130"
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
 BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/infinity6e-ssc012b.config"
 
-# No BR2_LINUX_KERNEL_PATCH. The one fix this tree needed -- the Sun/Solaris
-# section flags binutils 2.42+ rejects -- is a commit in the fork. Leaving the
-# symbol unset also keeps core.fragment's Ingenic 4.9 patch directory from ever
-# applying here.
+# This board's own patch directory, named explicitly so core.fragment's Ingenic
+# one can never apply here. The Sun/Solaris section flags binutils 2.42+ rejects
+# are fixed by a commit in the fork rather than a patch.
+BR2_LINUX_KERNEL_PATCH="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/patches/linux"
+
 BR2_LINUX_KERNEL_UIMAGE=y
+# XZ rather than LZMA: with the ARMTHUMB filter the patch directory above
+# restores, XZ is ~86KB smaller here than lzma -9.
 BR2_LINUX_KERNEL_XZ=y
 # BR2_LINUX_KERNEL_INSTALL_TARGET is not set
 
