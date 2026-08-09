@@ -659,7 +659,10 @@ endif
 	@echo >>$(OUTPUT_DIR)/.config
 	# Kernel config override: only 3.10.14 uses official kernel.org tarball + patches.
 	# All other versions (4.4.94, 7.1-rc1) use custom git repo from thingino-linux.
-	@if [ "$(KERNEL_VERSION)" != "3.10.14" ]; then \
+	# Requires a KERNEL_SITE. A vendor that names its kernel in a fragment
+	# instead leaves it empty, and writing it here would blank the fragment's
+	# repo and hash.
+	@if [ "$(KERNEL_VERSION)" != "3.10.14" ] && [ -n "$(KERNEL_SITE)" ]; then \
 		echo "** kernel override: $(KERNEL_VERSION) uses custom git repo"; \
 		$(SED) 's/^BR2_LINUX_KERNEL_CUSTOM_VERSION=y/# BR2_LINUX_KERNEL_CUSTOM_VERSION is not set/' $(OUTPUT_DIR)/.config; \
 		$(SED) '/^BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE=/d' $(OUTPUT_DIR)/.config; \
