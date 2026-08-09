@@ -91,6 +91,9 @@ BR2_PACKAGE_THINGINO_DIAG=y
 BR2_PACKAGE_THINGINO_HA=y
 BR2_PACKAGE_THINGINO_SYSTEM=y
 BR2_PACKAGE_THINGINO_SYSUPGRADE=y
+# Carried here for the same reason core.fragment carries it: the VPN choice
+# defaults to NONE, so the camera baseline is what turns WireGuard on.
+BR2_PACKAGE_THINGINO_VPN_WIREGUARD=y
 
 # Omitted on purpose, unlike core.fragment:
 #   BR2_PACKAGE_THINGINO_GPIO / _LEDD / _DAYNIGHT  - Ingenic GPIO register access
