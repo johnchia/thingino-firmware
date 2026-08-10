@@ -18,7 +18,7 @@
 SIGMASTAR_SDK_SITE_METHOD = git
 SIGMASTAR_SDK_SITE = https://github.com/johnchia/sigmastar-sdk
 SIGMASTAR_SDK_SITE_BRANCH = main
-SIGMASTAR_SDK_VERSION = cca10f4dba1ee1f3b856554494185d0e8ad7e2c8
+SIGMASTAR_SDK_VERSION = 3e8f8a844958f143e53e80e3db2334ca4c9ce816
 SIGMASTAR_SDK_LICENSE = PROPRIETARY (mi modules), GPL-2.0 (sensor drivers)
 SIGMASTAR_SDK_REDISTRIBUTE = NO
 
@@ -32,8 +32,8 @@ SIGMASTAR_SDK_DEPENDENCIES = linux
 # reach anything make consumes directly: in MODULE_SUBDIRS the backticks never
 # run and the embedded $(MAKE) leaks through as a path.
 #
-# VENDOR_KREL is where the payload sits inside the repo. That is a property of
-# the fetched tree, so it is a literal.
+# SIGMASTAR_KREL is where the payload sits inside the repo, a property of the
+# fetched tree. soc/sigmastar/<family>.mk states it.
 #
 # They are required to be equal: the vendor modules are prebuilt and insmod
 # checks vermagic, which is why core-sigmastar.fragment pins the kernel. A
@@ -43,7 +43,11 @@ SIGMASTAR_SDK_DEPENDENCIES = linux
 # KERNEL_VERSION is deliberately NOT used for either. thingino.mk sets it to
 # "4.9" for this vendor, which only names an output directory.
 SIGMASTAR_SDK_KREL = $(LINUX_VERSION_PROBED)
-SIGMASTAR_SDK_VENDOR_KREL = 4.9.84
+
+# The repository is keyed by family first: every artifact below is built for one
+# chip. Indexing without $(SOC_FAMILY) is what previously let an Infinity6B0
+# build resolve Infinity6E's MI modules.
+SIGMASTAR_SDK_FAMILY = $(@D)/$(SOC_FAMILY)
 
 # Prebuilt vendor modules, keyed by the build they came from and not merely by
 # kernel release. Across a single vendor release the <libc>/<gcc> trees are not
@@ -52,9 +56,12 @@ SIGMASTAR_SDK_VENDOR_KREL = 4.9.84
 # module sets. vermagic is byte-identical across all of them and
 # CONFIG_MODVERSIONS is off, so insmod accepts a foreign module and it fails
 # later at symbol resolution, or misbehaves. Nothing at load time catches it,
-# which is why the flavour is spelled out here. See the repo's PROVENANCE.
-SIGMASTAR_SDK_FLAVOUR = 0607-glibc-9.1.0
-SIGMASTAR_SDK_KMOD = $(@D)/$(SIGMASTAR_SDK_VENDOR_KREL)/kmod-$(SIGMASTAR_SDK_FLAVOUR)
+# which is why the whole flavour is spelled out in the path.
+#
+# The components come from soc/sigmastar/<family>.mk, which is also where
+# sigmastar-lib reads them: the two repositories hold halves of one vendor build
+# and a single definition keeps their pins in step. See the repo's PROVENANCE.
+SIGMASTAR_SDK_KMOD = $(SIGMASTAR_SDK_FAMILY)/kmod-$(SIGMASTAR_KREL)-$(SIGMASTAR_DROP)-$(SIGMASTAR_LIBC)-$(SIGMASTAR_GCC)
 
 # Sensor drivers, compiled here, so no vermagic problem. No flavour key:
 # drv_sensor.h is byte-identical between vendor releases nine months apart, and
@@ -66,7 +73,7 @@ SIGMASTAR_SDK_KMOD = $(@D)/$(SIGMASTAR_SDK_VENDOR_KREL)/kmod-$(SIGMASTAR_SDK_FLA
 # the build to the sensor on the development board is exactly what this must not
 # do. INSTALL_MOD_DIR puts them in /lib/modules/<release>/sigmastar, alongside
 # the prebuilt vendor modules and where load_sigmastar looks.
-SIGMASTAR_SDK_MODULE_SUBDIRS = $(SIGMASTAR_SDK_VENDOR_KREL)/sensor-src/$(SOC_FAMILY)
+SIGMASTAR_SDK_MODULE_SUBDIRS = $(SOC_FAMILY)/sensor-src
 SIGMASTAR_SDK_MODULE_MAKE_OPTS = \
 	SENSOR_VERSION=$(SOC_FAMILY) \
 	INSTALL_MOD_DIR=$(SOC_VENDOR) \
@@ -87,10 +94,15 @@ define SIGMASTAR_SDK_INSTALL_TARGET_CMDS
 	# /etc/firmware is what MI_ISP_GetIspRoot reports on this board, so CUS3A
 	# reads iqfile0.bin from here at AE init. chagall.bin is VENC firmware and
 	# only shares the directory.
+	#
+	# Both are per family. The vendor keeps them per chip, and although the
+	# Infinity6E and Infinity6B0 copies happen to be byte-identical, that is a
+	# fact about those two chips rather than about the files.
 	$(INSTALL) -m 755 -d $(TARGET_DIR)/etc/firmware
-	$(INSTALL) -m 644 -t $(TARGET_DIR)/etc/firmware $(@D)/iqfile/*
 	$(INSTALL) -m 644 -t $(TARGET_DIR)/etc/firmware \
-		$(@D)/venc_fw/$(SOC_FAMILY)/*
+		$(SIGMASTAR_SDK_FAMILY)/iqfile/*
+	$(INSTALL) -m 644 -t $(TARGET_DIR)/etc/firmware \
+		$(SIGMASTAR_SDK_FAMILY)/venc_fw/*
 
 	# One sensor per target, in the shape ingenic-sdk installs: the blob under
 	# /usr/share/sensor, an /etc/sensor symlink, and a model file.
@@ -110,7 +122,7 @@ define SIGMASTAR_SDK_INSTALL_TARGET_CMDS
 				$(TARGET_DIR)/usr/share/sensor/$(SENSOR_1_MODEL).bin; \
 		else \
 			$(INSTALL) -D -m 644 \
-				$(@D)/sensor-iq/$(SOC_FAMILY)/$(SENSOR_1_MODEL).bin \
+				$(SIGMASTAR_SDK_FAMILY)/sensor-iq/$(SENSOR_1_MODEL).bin \
 				$(TARGET_DIR)/usr/share/sensor/$(SENSOR_1_MODEL).bin; \
 		fi; \
 		echo $(SENSOR_1_MODEL) > $(TARGET_DIR)/usr/share/sensor/model; \

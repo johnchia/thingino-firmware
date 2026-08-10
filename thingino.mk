@@ -74,6 +74,14 @@ SOC_MODEL_LESS_Z := $(subst z,,$(SOC_MODEL))
 export SOC_VENDOR
 export SOC_FAMILY
 export SOC_FAMILY_CAPS
+
+# Set by soc/sigmastar/*.mk only. Both sigmastar packages index their repository
+# with these, so the kernel modules and the userspace libraries cannot be pinned
+# to different vendor builds without a path failing to resolve.
+export SIGMASTAR_DROP
+export SIGMASTAR_LIBC
+export SIGMASTAR_GCC
+export SIGMASTAR_KREL
 export SOC_MODEL
 export SOC_MODEL_LESS_Z
 export SOC_RAM_MB

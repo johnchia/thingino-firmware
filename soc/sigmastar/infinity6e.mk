@@ -24,4 +24,21 @@ SOC_RAM_MB := 256
 KERNEL_SITE := https://github.com/johnchia/linux
 KERNEL_HASH := d85ef37e8ed2367db6b4b9a58d959d598d5cc130
 
+# The vendor build the prebuilt halves come from. sigmastar-sdk carries the
+# kernel modules and sigmastar-lib the userspace libraries; they are two halves
+# of one build, and both packages index their repository with these.
+#
+# Defined here rather than in either package because nothing at runtime checks
+# the pair: vermagic is byte-identical across the vendor's flavours and
+# CONFIG_MODVERSIONS is off, so a mismatched set insmods cleanly and fails later
+# at symbol resolution. One definition means bumping one repository without the
+# other stops resolving a path instead.
+#
+# KREL is the vendor's kernel release, which must equal what the built kernel
+# reports; it is checked against LINUX_VERSION_PROBED in sigmastar-sdk.mk.
+SIGMASTAR_DROP := 0607
+SIGMASTAR_LIBC := glibc
+SIGMASTAR_GCC  := 9.1.0
+SIGMASTAR_KREL := 4.9.84
+
 endif
