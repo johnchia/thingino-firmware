@@ -19,14 +19,14 @@ WIFI_RTL8188FU_MODULE_MAKE_OPTS = \
 # Enabling it anyway costs roughly 500KB of kernel text. That is invisible on
 # a board whose kernel partition is sized generously and fatal on one where
 # the kernel and rootfs share an 8MB part, so the block is guarded rather
-# than deleted: BR2_SOC_SIGMASTAR is the only vendor here with that problem
+# than deleted: BR2_SOC_VENDOR_SIGMASTAR is the only vendor here with that problem
 # today, and the guard evaluates true on every Ingenic build, leaving them
 # byte-for-byte as they were.
 #
 # Worth offering upstream as a straight removal for every board rather than a
 # guard -- but that is a claim about hardware nobody here can test, so it is
 # scoped to the vendor that can.
-ifeq ($(BR2_SOC_SIGMASTAR),y)
+ifeq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
 define WIFI_RTL8188FU_LINUX_CONFIG_FIXUPS
 	$(call KCONFIG_ENABLE_OPT,CONFIG_WLAN)
 	$(call KCONFIG_ENABLE_OPT,CONFIG_WIRELESS)

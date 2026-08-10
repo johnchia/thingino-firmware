@@ -1,7 +1,11 @@
 config BR2_PACKAGE_SIGMASTAR_OSDRV_INFINITY6B0
 	bool "sigmastar-osdrv-infinity6b0"
-	depends on BR2_SOC_SIGMASTAR
-	select BR2_PACKAGE_SIGMASTAR_OSDRV_SENSORS
+	depends on BR2_SOC_VENDOR_SIGMASTAR
+	# No select for the sensor modules: sigmastar-osdrv-sensors is gone, and
+	# sigmastar-sdk builds sensor-src/$(SOC_FAMILY) from source in its place.
+	# That package has no infinity6b0 tree yet, so this bundle ships the MI
+	# modules and tuning blobs and no sensor_*_mipi.ko. Nothing here needs one
+	# until a streamer does.
 	help
 	  SigmaStar Infinity6B0 vendor MI driver bundle: the mi_* kernel
 	  modules, the MI userspace libraries, the ISP firmware, and the

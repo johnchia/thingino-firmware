@@ -160,8 +160,9 @@ BR2_PACKAGE_DROPBEAR=y
 # Nothing is needed here as a result -- no entropy daemon, no init reordering.
 # The hwrng core's own kthread seeds the pool before userspace starts.
 
-# ipcinfo, and the i2c sensor probe behind it.
-BR2_PACKAGE_IPCTOOL=y
+# ipcinfo and its i2c sensor probe are not here: package/ipctool no longer
+# exists in this tree. Restore this line if it comes back.
+# BR2_PACKAGE_IPCTOOL is not set
 
 # The vendor MI bundle: mi_* kernel modules, MI userspace libraries, ISP
 # firmware and the per-sensor tuning blobs. S20sigmastar (shipped by the
