@@ -65,33 +65,41 @@ BR2_SIGMASTAR_SOC_MODEL="ssc333"
 # SoC; board/sigmastar/post-image.sh sizes every partition from it.
 FLASH_SIZE_MB=8
 
-# THE TOOLCHAIN IS PER-FAMILY, AND THIS FAMILY IS MUSL.
+# THE TOOLCHAIN IS THE INFINITY6E ONE, WHICH IS THE FALLBACK THIS FILE USED TO
+# DESCRIBE RATHER THAN THE MUSL DEFAULT IT USED TO SET.
 #
 # OpenIPC publishes one toolchain per SoC family and they do not share a libc:
-# toolchain.sigmastar-infinity6e is glibc (arm-openipc-linux-gnueabihf), and
-# toolchain.sigmastar-infinity6b0 is musl (arm-openipc-linux-musleabihf). Both
-# ssc333 defconfigs upstream use the musl one, so that is the combination with
-# field mileage on this silicon.
+# toolchain.sigmastar-infinity6b0 is musl (arm-openipc-linux-musleabihf), and
+# both ssc333 defconfigs upstream use it, so that is the combination with field
+# mileage on this silicon. It cannot be used here.
 #
-# core-sigmastar.fragment declares GLIBC for the Infinity6E board. Overriding
-# it here works because scripts/resolve_toolchain_value.sh walks the fragment
-# stack and the camera defconfig in order and takes the LAST match, and
-# Makefile:172 puts this file after the fragments. That resolution happens
-# before Buildroot runs, so it picks the toolchain fragment file too.
+# Its sysroot is not bare. It ships usr/include/mbedtls from mbedTLS 2.25.0,
+# which shadows Buildroot's 3.6.6 during a compile, and libcurl 8.21.0 stops at
+# md5.c with "mbedTLS 3.2.0 or later required". That is not declinable:
+# Config.in:78 selects BR2_PACKAGE_THINGINO_LIBCURL from the base block, and a
+# Kconfig select cannot be refused by a defconfig. So every build of this board
+# on that toolchain fails, whatever else is turned off. It is the same shape as
+# the zlib note at the end of this file, one library further on.
 #
-# If musl turns out to fight the application layer -- this is the first time
-# thingino's userspace is built for ARM against musl -- the fallback is the
-# Infinity6E glibc toolchain, which is the same GCC for the same architecture
-# and cares nothing for the SoC family in its name. That is a fallback and not
-# the default, because it would be a combination nobody has shipped.
-BR2_THINGINO_TOOLCHAIN_LIBC_MUSL=y
+# The Infinity6E toolchain is the same GCC for the same architecture and cares
+# nothing for the SoC family in its name. Its sysroot is bare, which is the
+# whole point, and it is the toolchain the working SigmaStar board already
+# uses. What it costs is glibc instead of musl on an 8MB part, and a
+# combination nobody has shipped on this silicon.
+#
+# The alternatives, if that cost bites: publish an infinity6b0 musl toolchain
+# built the way the Infinity6E one was -- only infinity6e assets exist today --
+# or strip the stale headers out of the extracted OpenIPC sysroot, which needs
+# machinery this tree does not have.
+BR2_THINGINO_TOOLCHAIN_LIBC_GLIBC=y
 BR2_TOOLCHAIN_EXTERNAL_CUSTOM=y
 BR2_TOOLCHAIN_EXTERNAL_DOWNLOAD=y
-BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/openipc/firmware/releases/download/toolchain/toolchain.sigmastar-infinity6b0.tgz"
-BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX="arm-openipc-linux-musleabihf"
-BR2_TOOLCHAIN_EXTERNAL_CUSTOM_MUSL=y
-BR2_TOOLCHAIN_EXTERNAL_GCC_13=y
+BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/johnchia/thingino-firmware/releases/download/toolchain-x86_64/thingino-toolchain-x86_64_infinity6e_glibc_gcc16-linux-arm.tar.gz"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX="arm-thingino-linux-gnueabihf"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_GLIBC=y
+BR2_TOOLCHAIN_EXTERNAL_GCC_16=y
 BR2_TOOLCHAIN_EXTERNAL_CXX=y
+# BR2_TOOLCHAIN_EXTERNAL_INET_RPC is not set
 
 # Makefile:580-588 appends 3.10 or 4.4 headers unconditionally from the Ingenic
 # KERNEL_VERSION and runs before this file is appended. The OpenIPC ARM
