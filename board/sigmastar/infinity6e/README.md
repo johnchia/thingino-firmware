@@ -145,3 +145,32 @@ thingino makes to this kernel is reviewable in the firmware tree, the base stays
 SHA-pinned, and no blob enters the repo. Forking `OpenIPC/linux` into the
 thingino org and pinning that removes the personal-account dependency
 separately, which is the part actually worth fixing.
+
+### This is not a SigmaStar peculiarity
+
+Ingenic is the same arrangement. `gtxaspec/thingino-linux` is a standalone
+import, not a fork of anything, and its `ingenic-t31` branch carries
+`arch/mips/xburst`, which vanilla `v3.10.14` does not have. The Ingenic BSP is
+committed into that repo exactly as the SigmaStar BSP is committed into this
+one; it is only invisible from here because it is history in another repo rather
+than a file in this tree. `core.fragment` sets `BR2_LINUX_KERNEL_CUSTOM_GIT` for
+every Ingenic kernel including 3.10.14, so no target in this project builds from
+a kernel.org tarball.
+
+The version-keyed patch directories are not evidence to the contrary, because
+none of them are reached. `pkg-utils.mk` resolves a package's patch directory to
+`<dir>/<version>` if that exists and otherwise to `<dir>`, and `linux/Config.in`
+sets `LINUX_VERSION` to the repo hash under `BR2_LINUX_KERNEL_CUSTOM_GIT`. So
+`package/all-patches/linux/3.10.14`, `/4.4.94` and `/7.1-rc1` are looked up under
+a hash that never matches, and the fallback holds no patches.
+`board/ingenic/xburst1/patches/linux` is referenced by nothing at all. Both are
+leftovers from before those fixes became commits in the gtxaspec repo. The
+comment in `Makefile` claiming 3.10.14 uses a kernel.org tarball describes an
+arrangement that no longer exists.
+
+`BR2_LINUX_KERNEL_PATCH` in `core-sigmastar.fragment` is the only kernel patch
+mechanism in this project that actually applies. Moving this board to a vanilla
+tarball would therefore not bring it into line with Ingenic — it would make it
+the first target to work that way, and leave Ingenic as the one still to
+convert. That may be the right direction, but it is a precedent rather than a
+correction.
