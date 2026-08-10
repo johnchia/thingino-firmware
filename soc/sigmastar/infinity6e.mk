@@ -18,4 +18,10 @@ SOC_RAM_MB := 256
 # No SOC_UBOOT_*: this vendor keeps its bootloader on the chip and does not use
 # BR2_TARGET_UBOOT.
 
+# Each SigmaStar family has its own vendor BSP on its own branch, so the kernel
+# tree is per family rather than per vendor. core-sigmastar.fragment reads these
+# through SED_CONFIG_VARS; the resolution block in thingino.mk is Ingenic-only.
+KERNEL_SITE := https://github.com/johnchia/linux
+KERNEL_HASH := d85ef37e8ed2367db6b4b9a58d959d598d5cc130
+
 endif

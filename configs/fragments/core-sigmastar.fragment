@@ -39,7 +39,9 @@ BR2_SYSTEM_DEFAULT_PATH="/bin:/sbin:/usr/bin:/usr/sbin"
 BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_THINGINO_PATH)/overlay"
 BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/scripts/rootfs_script.sh"
 
-# Kernel: a fork of OpenIPC's sigmastar-infinity6e tree, pinned by hash.
+# Kernel: a fork of OpenIPC's sigmastar-* trees, pinned by hash, one branch per
+# family. KERNEL_SITE and KERNEL_HASH come from soc/sigmastar/$(SOC_FAMILY).mk,
+# because each family carries its own vendor BSP -- see that file.
 #
 # It was fetched as archive/sigmastar-$(SOC_FAMILY).tar.gz, which names a branch
 # rather than a commit: the tree could change under a build with nothing in the
@@ -49,17 +51,19 @@ BR2_ROOTFS_POST_BUILD_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/scripts/rootfs_scrip
 #
 # No BR2_LINUX_KERNEL_CUSTOM_REPO_BRANCH here -- Buildroot has no such symbol
 # (linux/Config.in defines only _REPO_VERSION), so the line in core.fragment is
-# inert. The hash below is the only thing that selects the revision.
+# inert. The hash is the only thing that selects the revision.
 BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_CUSTOM_GIT=y
-BR2_LINUX_KERNEL_CUSTOM_REPO_URL="https://github.com/johnchia/linux"
-BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="d85ef37e8ed2367db6b4b9a58d959d598d5cc130"
+BR2_LINUX_KERNEL_CUSTOM_REPO_URL="$(KERNEL_SITE)"
+BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="$(KERNEL_HASH)"
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
-BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/kernel/$(KERNEL_VERSION)/ssc012b.config"
+BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/kernel/$(KERNEL_VERSION)/$(SOC_MODEL).config"
 
-# This board's own patch directory, named explicitly so core.fragment's Ingenic
-# one can never apply here. The Sun/Solaris section flags binutils 2.42+ rejects
-# are fixed by a commit in the fork rather than a patch.
+# This vendor's own patch directory, per family, named explicitly so
+# core.fragment's Ingenic one can never apply here. Infinity6E needs no patch
+# for the Sun/Solaris section flags binutils 2.42+ rejects -- that is a commit in
+# its branch of the fork -- but Infinity6B0's branch is unmodified upstream, so
+# it carries the same fix as a patch.
 BR2_LINUX_KERNEL_PATCH="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/patches/linux"
 
 BR2_LINUX_KERNEL_UIMAGE=y

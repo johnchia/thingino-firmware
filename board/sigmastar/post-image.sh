@@ -49,13 +49,17 @@
 # LX_MEM/mma_heap/cma are the SigmaStar memory carveout, and without them the
 # MI drivers get no contiguous memory and nothing streams. They are written as
 # ${memlx}/${memsz} rather than literals because the bootloader sets those from
-# the RAM size it detects at runtime (infinity6e/chip.c), so one image serves
+# the RAM size it detects at runtime (the family's chip.c), so one image serves
 # every DRAM population of this SoC.
 
 set -eu
 
 BINARIES_DIR="$1"
-IMAGE_NAME="ssc30kq_${OPENIPC_VARIANT:-image}"
+# SOC_MODEL is exported by thingino.mk. Nothing else in this script is family-
+# specific: the flash size comes from the camera defconfig, the two fixed
+# partitions are properties of the bootloader, and the rest is sized to the
+# images actually built.
+IMAGE_NAME="${SOC_MODEL:-sigmastar}_${OPENIPC_VARIANT:-image}"
 
 ALIGN=65536
 FLASH_KB=$((${FLASH_SIZE_MB:-16} * 1024))
@@ -228,7 +232,7 @@ fi
 # does not begin with a magic number -- see image_starts_with_bootloader in
 # thingino-sysupgrade, which is what teaches sysupgrade to recognise this.
 if [ -n "$BOOT_BIN" ] && [ -f "$BINARIES_DIR/u-boot-env.bin" ]; then
-	FIRMWARE_BIN="$BINARIES_DIR/thingino-${CAMERA:-ssc30kq}.bin"
+	FIRMWARE_BIN="$BINARIES_DIR/thingino-${CAMERA:-${SOC_MODEL:-sigmastar}}.bin"
 
 	dd if=/dev/zero bs=$ALIGN count=$((DATA_ADDR / ALIGN)) status=none |
 		tr '\000' '\377' >"$FIRMWARE_BIN"
