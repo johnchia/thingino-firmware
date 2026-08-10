@@ -8,6 +8,8 @@ SOC_FAMILY := infinity6b0
 # coincide. Infinity6B0 and Infinity6E are both Cortex-A7 but carry separate
 # vendor BSPs on separate kernel branches, so they cannot share this level.
 SOC_ARCH   := infinity6b0
+# Cortex-A7. Reaches .config as BR2_$(SOC_CPU) through soc-sigmastar.fragment.
+SOC_CPU    := cortex_a7
 
 # The DRAM is inside the SoC package, so a board cannot choose it. The 64MB
 # tier is what SSC333 ships; see the mma_heap carveout in package/sigmastar-uboot.

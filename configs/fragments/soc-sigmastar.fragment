@@ -1,5 +1,7 @@
 BR2_arm=y
-BR2_cortex_a7=y
+# Not every SigmaStar family is the same core: Infinity6E and Infinity6B0 are
+# Cortex-A7, Infinity6C is Cortex-A35. soc/sigmastar/<family>.mk names it.
+BR2_$(SOC_CPU)=y
 BR2_ARM_FPU_NEON_VFPV4=y
 BR2_ARM_INSTRUCTIONS_THUMB2=y
 

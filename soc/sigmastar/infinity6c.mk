@@ -1,0 +1,46 @@
+# SigmaStar Infinity6C family. Included for every board; the filter
+# below is what limits it to this family's models.
+ifneq ($(filter $(SOC_MODEL),ssc377de),)
+
+SOC_FAMILY := infinity6c
+# Selects a board/kernel subdirectory. For Ingenic that is an ISA shared by
+# several families; here the family is the finest split that exists, so the two
+# coincide.
+SOC_ARCH   := infinity6c
+# Cortex-A35, not the A7 the other two families run. ARMv8-A executing aarch32,
+# so the same arm-linux-gnueabihf toolchain builds for it.
+SOC_CPU    := cortex_a35
+
+# 128MB is what SSC377DE carries. In-package, so a board cannot choose it.
+SOC_RAM_MB := 128
+
+# No SOC_UBOOT_*: this vendor keeps its bootloader on the chip and does not use
+# BR2_TARGET_UBOOT.
+
+# 5.10, not the 4.9 the other two families run. thingino.mk sets 4.9 for this
+# vendor before including these files, so this overrides it. It names an output
+# directory and the board/sigmastar/<family>/kernel/<ver>/ subdirectory.
+KERNEL_VERSION := 5.10
+
+# OpenIPC's infinity6c branch, pinned. Unlike the other two families this is
+# vanilla plus a BSP patch rather than a vendor tree: b335d21 applies
+# 0000-infinity6c-kernel-5.10.61.patch directly on Linux 5.10.61, with seven
+# OpenIPC commits after it. See sigmastar-sdk's infinity6c/PROVENANCE -- that
+# BSP is NOT the one release_0907's modules were built against, and the pairing
+# is argued there rather than assumed.
+KERNEL_SITE := https://github.com/johnchia/linux
+KERNEL_HASH := d17f67f1f90259dab41b6b6abb28fb64348d83e9
+
+# The vendor build the prebuilt halves come from -- see infinity6e.mk for why
+# this lives here rather than in either package.
+#
+# glibc rather than uclibc because the toolchain is glibc and these libraries
+# are loaded into our processes. Both variants exist in both repositories; the
+# kernel modules barely differ between them, the userspace libraries genuinely
+# do.
+SIGMASTAR_DROP := 0907
+SIGMASTAR_LIBC := glibc
+SIGMASTAR_GCC  := 11.1.0
+SIGMASTAR_KREL := 5.10.61
+
+endif

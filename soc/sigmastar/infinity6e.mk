@@ -7,6 +7,8 @@ SOC_FAMILY := infinity6e
 # several families; here the family is the finest split that exists, so the two
 # coincide.
 SOC_ARCH   := infinity6e
+# Cortex-A7. Reaches .config as BR2_$(SOC_CPU) through soc-sigmastar.fragment.
+SOC_CPU    := cortex_a7
 
 # The DRAM is inside the SoC package, so a board cannot choose it. Reaches
 # .config as BR2_SOC_RAM_MB, whose only consumers are the Ingenic ISP module's

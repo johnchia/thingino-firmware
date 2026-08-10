@@ -44,7 +44,7 @@ config BR2_SIGMASTAR_SOC_MODEL
 	  Enter the SigmaStar SoC model name for your device (e.g., ssc30kq).
 	  This value is used to automatically derive the SoC family.
 
-	  Supported models: ssc30kq
+	  Supported models: ssc30kq, ssc333, ssc377de
 
 	  Note: Model name is case-insensitive.
 
@@ -64,6 +64,8 @@ config BR2_SOC_FAMILY
 	# Only one vendor's model symbol is ever non-empty, so the two halves of
 	# this chain cannot both match and their order does not matter.
 	default "infinity6e" if BR2_SIGMASTAR_SOC_MODEL = "ssc30kq"
+	default "infinity6b0" if BR2_SIGMASTAR_SOC_MODEL = "ssc333"
+	default "infinity6c" if BR2_SIGMASTAR_SOC_MODEL = "ssc377de"
 
 config BR2_SOC_RAM_MB
 	int "RAM size in MB"

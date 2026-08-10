@@ -1,0 +1,65 @@
+# NAME: Unbranded SSC377DE (Infinity6C, SC430AI)
+#
+# First Infinity6C target. Bring-up only: it exists to prove the family builds
+# -- kernel, vendor modules and vendor userspace -- not to stream. See
+# board/sigmastar/infinity6c/ and sigmastar-sdk's infinity6c/PROVENANCE.
+#
+# No streamer. thingino-raptor-hal's SigmaStar backend declares INFINITY6E and
+# INFINITY6B0 only, so selecting raptor here would fail the build on a missing
+# platform rather than tell us anything about the family.
+# FRAG: soc-sigmastar core-sigmastar ssl-mbedtls
+
+# board.mk includes this file as a makefile before thingino.mk runs, so the
+# vendor and model are readable there and drive SOC_VENDOR / SOC_MODEL /
+# SOC_FAMILY / SOC_ARCH / SOC_CPU / KERNEL_VERSION.
+#
+# The vendor has to be declared here and not only in soc-sigmastar.fragment:
+# fragments are appended to .config, never included as makefiles, so a symbol
+# set only in a fragment is invisible to thingino.mk's vendor dispatch.
+BR2_SOC_VENDOR_SIGMASTAR=y
+BR2_SIGMASTAR_SOC_MODEL="ssc377de"
+
+# One of the two sensors the vendor ships tuning for on this chip. There is no
+# sc430ai driver in sensor-src -- upstream carries gc4653, os04a10, sc401ai,
+# sc4336p, sc450ai, sc501ai, sc830ai, sc850sl and symlinks imx335/imx415 -- so
+# this selects the IQ blob without a matching module. Fine for a build; a
+# streaming target needs one or the other changed.
+BR2_SENSOR_1_NAME="sc430ai"
+
+FLASH_SIZE_MB=8
+
+# Same ARM toolchain the Infinity6E target uses. Nothing in it is 6E-specific:
+# it is a generic arm-thingino-linux-gnueabihf, and Cortex-A35 executes the
+# same aarch32 code. Re-pointed here because the toolchain fragment is resolved
+# from TYPE/GCC/LIBC alone (Makefile:185), which has no architecture in it, so
+# the file appended is always thingino's mipsel one. The camera defconfig is
+# appended after the fragments, so these win.
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM=y
+BR2_TOOLCHAIN_EXTERNAL_DOWNLOAD=y
+BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/johnchia/thingino-firmware/releases/download/toolchain-x86_64/thingino-toolchain-x86_64_infinity6e_glibc_gcc16-linux-arm.tar.gz"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX="arm-thingino-linux-gnueabihf"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_GLIBC=y
+BR2_TOOLCHAIN_EXTERNAL_GCC_16=y
+BR2_TOOLCHAIN_EXTERNAL_CXX=y
+# BR2_TOOLCHAIN_EXTERNAL_INET_RPC is not set
+
+# The toolchain is built against 4.9 headers, which is what it has regardless of
+# this board running a 5.10 kernel -- Buildroot checks this against the sysroot,
+# so it states what is there rather than what we would like. Headers older than
+# the kernel are the supported direction.
+BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
+
+# Vendor U-Boot stays on the chip. No BR2_PACKAGE_SIGMASTAR_UBOOT either: that
+# package builds an Infinity6E NOR image and has no 6C board.
+BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/post-image.sh"
+
+# Gates the camera stack in Config.soc.in. Left unset, the streamer choice
+# quietly defaults to None with nothing in the log to say why -- which is what
+# this target wants, but state it rather than get it by accident.
+BR2_THINGINO_DEV_IPCAM=y
+
+BR2_PACKAGE_DROPBEAR=y
+
+# See the Infinity6E target: the external toolchain's bundled libz is not copied
+# into the target, so anything linking -lz needs a real target zlib.
+BR2_PACKAGE_ZLIB=y

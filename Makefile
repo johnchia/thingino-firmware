@@ -268,6 +268,7 @@ NPROC := $(shell nproc)
 SED_CONFIG_VARS = sed \
 	's/\$$[(]BR2_HOSTARCH[)]/$(BR2_HOSTARCH)/g; \
 	 s/\$$[(]SOC_ARCH[)]/$(SOC_ARCH)/g; \
+	 s/\$$[(]SOC_CPU[)]/$(SOC_CPU)/g; \
 	 s/\$$[(]SOC_TARGET_ARCH[)]/$(SOC_TARGET_ARCH)/g; \
 	 s/\$$[(]TOOLCHAIN_SOC_TAG[)]/$(TOOLCHAIN_SOC_TAG)/g; \
 	 s/\$$[(]SOC_MODEL[)]/$(SOC_MODEL)/g; \
