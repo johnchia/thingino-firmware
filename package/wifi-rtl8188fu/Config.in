@@ -1,7 +1,17 @@
 config BR2_PACKAGE_WIFI_RTL8188FU
 	bool "Realtek RTL8188FU"
 	select BR2_LINUX_KERNEL
-	select BR2_PACKAGE_THINGINO_KOPT_DWC2
-	select BR2_PACKAGE_THINGINO_KOPT_DWC2_WIFI_ONLY
+	# Guarded on !BR2_SOC_SIGMASTAR, the same discipline as the Ingenic
+	# selects in thingino-raptor's Config.in: the guard is y on every
+	# Ingenic build, so those are unchanged by construction.
+	#
+	# This is a USB device, so it needs a host controller -- but it does not
+	# need *this* host controller. BR2_PACKAGE_THINGINO_KOPT_DWC2 turns on
+	# CONFIG_USB_JZ_DWC2, the Ingenic JZ integration of the DesignWare OTG
+	# core, which exists on no other vendor's SoC. SigmaStar Infinity6 parts
+	# reach USB through EHCI, already CONFIG_USB_EHCI_HCD=y in the kernel
+	# config those boards ship, so there is nothing to select here.
+	select BR2_PACKAGE_THINGINO_KOPT_DWC2 if !BR2_SOC_SIGMASTAR
+	select BR2_PACKAGE_THINGINO_KOPT_DWC2_WIFI_ONLY if !BR2_SOC_SIGMASTAR
 	help
 	  RTL8188FU wireless driver

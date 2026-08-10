@@ -124,6 +124,10 @@ source "$BR2_EXTERNAL_THINGINO_PATH/package/mbedtls-certgen/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/open-tx-isp/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/openimp/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-lib/Config.in"
+# Infinity6B0's vendor bundle is vendored here rather than fetched, because
+# johnchia/sigmastar-lib carries an INFINITY6E tree and no INFINITY6B0 one.
+# Fold it into sigmastar-lib/-sdk once those repos gain the family.
+source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-osdrv-infinity6b0/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-sdk/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/sigmastar-uboot/Config.in"
 source "$BR2_EXTERNAL_THINGINO_PATH/package/spi-tmi8152/Config.in"

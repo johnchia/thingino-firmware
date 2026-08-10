@@ -1,0 +1,109 @@
+From: thingino sigmastar port
+Subject: [PATCH] hw_random: sstar-rng: credit conservatively, reject a stuck RNG
+
+The SoC has a hardware TRNG in the RSA/crypto block, reachable through
+HAL_RNG_Read(). The vendor already wires it up: mdrv_aes.c calls
+sstar_rng_probe() from the AES driver's probe under CONFIG_SS_RNG, which is why
+the platform_driver block at the bottom of this file is commented out -- it is
+dead by design, not by accident. Only the Kconfig symbol was missing.
+
+Enabling it fixes a real boot stall. This board has almost no entropy at boot:
+no ethernet, no disk, and wlan0 does not exist yet, while S02ssl generates the
+uhttpd certificate through mbedTLS, whose entropy poll uses a blocking
+getrandom(). Init waits at S02 for a CRNG only later stages of the same init
+sequence could seed. With a serial console attached, typing gets past it;
+headless, it just looks hung.
+
+Two changes, both about not overstating what this hardware gives us.
+
+1. Quality 500 -> 128. The hwrng core credits rc * quality * 8 >> 10 bits per
+   read, so 500 claims just under 4 bits of entropy per byte. 128 credits
+   exactly 1 bit per byte: an 8x margin against full credit, and ~4x more
+   conservative than the vendor's figure. Nobody here has run a statistical
+   suite against this TRNG and the vendor's number is unsourced, so this is
+   chosen to be defensible rather than accurate. It is tunable at runtime via
+   /sys/module/hw_random/parameters/current_quality, which hwrng_fillfn
+   re-reads every iteration.
+
+2. Reject a stuck generator. HAL_RNG_Read() polls a ready bit 20 times and then
+   reads the data register anyway, so a dead or unclocked RNG returns stale or
+   constant values rather than an error -- and crediting entropy for those is
+   worse than crediting none, because it fails silently. Comparing against the
+   previous value is the NIST SP 800-90B repetition count test in its cheapest
+   form. Retrying first avoids a spurious 10-second back-off on the ~1-in-65536
+   chance repeat a healthy 16-bit source produces.
+
+Applies to Infinity6E and Infinity6B0 alike; the driver is byte-identical in
+both OpenIPC kernel trees and RSA_BASE_ADDR is 0x112200 on both.
+
+--- a/drivers/sstar/crypto/char/hw_random/sstar-rng.c	2026-07-31 18:05:45.471754776 -0700
++++ b/drivers/sstar/crypto/char/hw_random/sstar-rng.c	2026-07-31 18:05:45.497046814 -0700
+@@ -32,13 +32,49 @@
+     struct hwrng rng;
+ };
+ 
++/*
++ * Attempts to get a value differing from the previous one before declaring the
++ * generator stuck. A healthy 16-bit source repeats about 1 read in 65536 by
++ * chance; five consecutive identical values put that at 2^-64.
++ */
++#define SSTAR_RNG_STUCK_RETRIES 5
++
+ static int sstar_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
+ {
+     //struct sstar_rng *hrng = to_sstar_rng(rng);
+     u16 *data = buf;
+-    //printk("[%s,%d] max(%d)\n",__FUNCTION__,__LINE__, max);
+-    *data = HAL_RNG_Read();
+-    return 2;
++    static u16 prev;
++    static bool have_prev;
++    u16 val = 0;
++    int tries;
++
++    if (max < sizeof(*data))
++        return 0;
++
++    /*
++     * HAL_RNG_Read() polls a ready bit 20 times and then reads the data
++     * register anyway, so a dead or unclocked RNG returns stale or constant
++     * values rather than an error. Feeding those to the pool while crediting
++     * entropy for them is worse than crediting nothing: the pool fills, boot
++     * proceeds, and every key is drawn from a stuck source.
++     */
++    for (tries = 0; tries < SSTAR_RNG_STUCK_RETRIES; tries++) {
++        val = HAL_RNG_Read();
++        if (!have_prev || val != prev)
++            break;
++    }
++
++    if (have_prev && val == prev) {
++        pr_warn_ratelimited("sstar-rng: %d identical reads (0x%04x), generator appears stuck\n",
++                            SSTAR_RNG_STUCK_RETRIES, val);
++        return 0;
++    }
++
++    prev = val;
++    have_prev = true;
++
++    *data = val;
++    return sizeof(*data);
+ }
+ 
+ int sstar_rng_probe(struct platform_device *pdev)
+@@ -63,7 +99,14 @@
+     rng->rng.init = NULL;;
+     rng->rng.cleanup = NULL;
+     rng->rng.read = sstar_rng_read;
+-    rng->rng.quality = 500;
++    /*
++     * 1 bit of credited entropy per byte read; the hwrng core credits
++     * rc * quality * 8 >> 10. Conservative on purpose -- the vendor's 500
++     * (just under 4 bits/byte) is unsourced and this TRNG has not been
++     * characterised here. Tunable live, without a rebuild, via
++     * /sys/module/hw_random/parameters/current_quality.
++     */
++    rng->rng.quality = 128;
+ 
+     ret = devm_hwrng_register(&pdev->dev, &rng->rng);
+     if (ret) {

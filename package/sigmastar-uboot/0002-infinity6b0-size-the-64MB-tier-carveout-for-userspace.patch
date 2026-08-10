@@ -1,0 +1,47 @@
+From: thingino-firmware sigmastar fork
+Subject: [PATCH] infinity6b0: size the 64MB tier's mma carveout for userspace
+
+board_late_init sets memlx/memsz from detected DRAM, and the generated
+bootargs reference those variables rather than literals, so one image serves
+every DRAM population of this SoC. This changes what the 64MB tier reserves:
+
+    mma_heap sz  0x2000000 (32MB)  ->  0x1800000 (24MB)
+
+The carveout is reserved out of LX_MEM, not alongside it -- the two figures
+in /proc/cmdline are not additive. On a 64MB part that makes the split:
+
+    LX_MEM=0x3FE0000     63.9MB   all Linux is told about
+      mma_heap                    24.0MB   vendor multimedia pool
+      cma                          2.0MB
+      kernel image + misc          4.4MB
+      -> userspace                         33.4MB   (32MB pool left 25.4MB)
+
+25.4MB carries the streamer alone and nothing else; a web UI session on top
+is what it cannot absorb. The 8MB is not free -- it is charged against the
+video profile, which must be sized to fit whatever remains. Buffer cost
+scales with resolution and is independent of fps, so the pool constrains
+geometry rather than frame rate.
+
+THE 128MB AND 256MB TIERS ARE LEFT ALONE ON PURPOSE. They have no shortage
+to relieve, and capping their pool at 24MB would limit what those boards can
+encode for no gain. Anything applied here must stay inside the 64MB branch.
+
+A 64MB board that would rather have the stock pool than the headroom -- one
+running a large main stream with no web UI -- wants this patch dropped, not
+edited: 0x2000000 is the vendor's value for the tier.
+
+Scoped to this family by the file it patches. arch/arm/cpu/armv7/Makefile
+builds infinity6b0/ only under CONFIG_INFINITY6B0, and each Infinity6 family
+carries its own chip.c, so no other SigmaStar target compiles this code.
+
+--- a/arch/arm/cpu/armv7/infinity6b0/chip.c
++++ b/arch/arm/cpu/armv7/infinity6b0/chip.c
+@@ -315,7 +315,7 @@
+         setenv("memsz", "0x4600000");
+     } else {
+         setenv("memlx", "0x3FE0000");
+-        setenv("memsz", "0x2000000");
++        setenv("memsz", "0x1800000");
+     }
+
+     return 0;

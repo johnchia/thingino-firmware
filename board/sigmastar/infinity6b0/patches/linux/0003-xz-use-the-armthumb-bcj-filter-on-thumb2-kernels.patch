@@ -1,0 +1,62 @@
+xz: use the ARMTHUMB BCJ filter on Thumb-2 kernels
+
+scripts/xz_wrap.sh picks the BCJ filter from SRCARCH alone, so any ARM target
+gets --arm. That filter rewrites A32 branch instructions. Under
+CONFIG_THUMB2_KERNEL the kernel is T32, so it matches almost nothing and mostly
+damages the entropy model -- on this board it produced a larger image than
+passing no filter at all:
+
+  xz --arm         1856640
+  xz (no filter)   1843920
+  xz --armthumb    1756680
+
+The decompressor has to agree. lib/decompress_unxz.c compiles in exactly one
+BCJ decoder, chosen by architecture, and for ARM that is XZ_DEC_ARM. Without
+the second hunk a kernel compressed with --armthumb cannot decompress itself
+and the board does not boot. The ARMTHUMB decoder is already implemented in
+lib/xz/xz_dec_bcj.c; enabling it costs a few hundred bytes.
+
+Both hunks key on CONFIG_THUMB2_KERNEL, so an A32 kernel is unchanged.
+
+Upstream Linux has the same defaults, so this is not specific to this fork.
+
+diff -ur a/lib/decompress_unxz.c b/lib/decompress_unxz.c
+--- a/lib/decompress_unxz.c
++++ b/lib/decompress_unxz.c
+@@ -129,7 +129,11 @@
+ #	define XZ_DEC_POWERPC
+ #endif
+ #ifdef CONFIG_ARM
+-#	define XZ_DEC_ARM
++#	ifdef CONFIG_THUMB2_KERNEL
++#		define XZ_DEC_ARMTHUMB
++#	else
++#		define XZ_DEC_ARM
++#	endif
+ #endif
+ #ifdef CONFIG_IA64
+ #	define XZ_DEC_IA64
+diff -ur a/scripts/xz_wrap.sh b/scripts/xz_wrap.sh
+--- a/scripts/xz_wrap.sh
++++ b/scripts/xz_wrap.sh
+@@ -12,11 +12,19 @@
+ BCJ=
+ LZMA2OPTS=
+ 
++# A Thumb-2 kernel is T32, not A32: --arm rewrites instruction patterns
++# that are not there. Must stay in step with lib/decompress_unxz.c, which
++# compiles in exactly one BCJ decoder.
++ARM_BCJ=--arm
++if grep -q '^CONFIG_THUMB2_KERNEL=y' "${KCONFIG_CONFIG:-.config}" 2>/dev/null; then
++	ARM_BCJ=--armthumb
++fi
++
+ case $SRCARCH in
+ 	x86)            BCJ=--x86 ;;
+ 	powerpc)        BCJ=--powerpc ;;
+ 	ia64)           BCJ=--ia64; LZMA2OPTS=pb=4 ;;
+-	arm)            BCJ=--arm ;;
++	arm)            BCJ=$ARM_BCJ ;;
+ 	sparc)          BCJ=--sparc ;;
+ esac
+ 

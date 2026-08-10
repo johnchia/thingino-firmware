@@ -17,8 +17,8 @@
 # /etc/os-release (stamped at build time by scripts/rootfs_script.sh) or from
 # procfs.
 #
-# Only the model constant below is board-specific; everything else is
-# vendor-level and needs no change for a second SigmaStar board.
+# Everything here is vendor-level: the model and family are read from the
+# build-stamped /etc/os-release, so a second SigmaStar family needs no change.
 
 # Overridable so the parsing can be exercised off-target.
 OS_RELEASE="${OS_RELEASE:-/etc/os-release}"
@@ -28,10 +28,12 @@ os_release_value() {
 	sed -rn "s/^$1=\"?([^\"]*)\"?$/\1/p" "$OS_RELEASE" | head -n1
 }
 
-# The one board-specific constant in this file. Once SOC_MODEL is stamped into
-# /etc/os-release it can be read like the family below.
+# Build-stamped like the family below. The fallback is the first board this
+# file served, for an image built before SOC_MODEL was stamped.
 print_soc_model() {
-	echo "ssc30kq"
+	model=$(os_release_value SOC_MODEL)
+	[ -n "$model" ] || model="ssc30kq"
+	echo "$model"
 }
 
 # Build-stamped, so it tracks the defconfig rather than being repeated here.
