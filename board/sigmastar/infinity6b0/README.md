@@ -7,10 +7,15 @@ confirmed on the unit:
 - **Boot no longer stalls on entropy.** `CONFIG_SS_RNG` was the whole fix; a
   headless unit reaches userspace without anyone touching the console.
 - **`sysupgrade` works.** The board takes a full image over the network, so the
-  SOIC clip is no longer the only way to update it. That also exercises the
-  compiled-in partition table: a full sysupgrade rewrites `all`, mtd0 included,
-  so the bootloader now on the chip is one carrying its own table.
-- **Video works.** Raptor streams on this board — see the streamer note below.
+  SOIC clip is no longer the only way to update it.
+
+**Two things below describe the branch this port was developed on and are not in
+this tree yet.** The streamer is off here: thingino derives raptor's `PLATFORM`
+from `SOC_FAMILY`, and the pinned raptor has no `INFINITY6B0` backend, so
+selecting it fails the build rather than degrading. The compiled-in partition
+table is not here either — its other half was a post-image script this tree does
+not use. Both sections are kept because the reasoning still holds and is what
+the next step needs; read them as the plan, not the state.
 
 **No ethernet.** The KD110v2 has a debug header and nothing else: no MAC pins
 brought out, no PHY, no magnetics. The kernel is built without the wired stack
@@ -142,13 +147,21 @@ devmem 0x1F203154 32
 devmem 0x1F203158 32
 ```
 
-Why it matters: this board's `overlay/usr/sbin/soc` deliberately returns
-nothing for `soc -s`, because the die-ID registers have only ever been verified
-on Infinity6E and `S03mac` *persists* what it is handed. If the tag is neither
-`0x0000` nor `0xFFFF` and the three words are neither all-zero nor all-ones,
-the block is real and the Infinity6E implementation can be adopted with this
-tag added to its accepted set. Nothing on this board needs it — there is no
-wired interface — so this is groundwork for the next Infinity6B0.
+Why it matters: `soc -s` already returns nothing here, and it does so by
+accident of a deliberate guard rather than by knowing about this family.
+`package/thingino-system/files/soc.sigmastar` is shared by both families and
+refuses to read the die-ID registers unless the generation tag reads `241`
+(`0xF1`), which is the Infinity6E value verified on hardware. An Infinity6B0
+reads something else, falls through the guard, and reports no serial. That is
+the right outcome — `S03mac` *persists* what it is handed, so a degenerate ID
+would bake one identity into every unit — but it is untested silence, not a
+verified answer.
+
+So capture the four registers above. If the tag is neither `0x0000` nor
+`0xFFFF` and the three words are neither all-zero nor all-ones, the block is
+real and this family's tag can be added to that guard's accepted set. Nothing
+on this board needs it — there is no wired interface — so it is groundwork for
+the next Infinity6B0.
 
 ## Stage 1 — dump the flash. This is not optional.
 
@@ -210,7 +223,7 @@ uhttpd certificate, with no ethernet, no disk and `wlan0` not up yet to
 generate interrupts. Typing on the serial console got past it — which is why it
 went unnoticed on a bench unit and bit a headless one.
 
-Entropy is credited conservatively: `board/sigmastar/patches` lowers the
+Entropy is credited conservatively: `board/sigmastar/infinity6b0/patches/linux` lowers the
 driver's claimed quality from the vendor's 500 to 128, i.e. **1 bit of entropy
 per byte read**. Retune live, without a rebuild:
 
