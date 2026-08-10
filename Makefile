@@ -1263,10 +1263,24 @@ endif
 	fi
 	exit
 
-# Rebuild U-Boot with actual partition sizes after rootfs is ready
+# Rebuild U-Boot with actual partition sizes after rootfs is ready.
+#
+# Ingenic only. That vendor's U-Boot comes from BR2_TARGET_UBOOT and has the
+# partition table compiled into it, so it has to be rebuilt once the rootfs size
+# is known. SigmaStar's comes from the sigmastar-uboot package, which Buildroot
+# has already built and installed under SOC_UBOOT_BIN by this point; its
+# partition table is read from the environment at boot, so there is nothing to
+# feed back. Running the recipe there asks for `uboot-dirclean`, which Buildroot
+# does not define when BR2_TARGET_UBOOT is off -- and it fires even though the
+# file exists, because regenerating uenv.txt makes the prerequisite newer.
 $(U_BOOT_BIN): $(U_BOOT_ENV_TXT)
+ifeq ($(SOC_VENDOR),sigmastar)
+	@test -f $@ || { echo "ERROR: $@ not found -- is BR2_PACKAGE_SIGMASTAR_UBOOT set?"; exit 1; }
+	@touch $@
+else
 	$(info -------------------------------- $@ (rebuilding with actual partition sizes))
 	$(call thingino_run_build,$(BR2_MAKE) $(BR2_MAKE_JOBS) host-libyaml host-uboot-tools uboot-dirclean uboot)
+endif
 
 $(UB_ENV_BIN): $(U_BOOT_ENV_TXT)
 	@$(TEAL) "$@"

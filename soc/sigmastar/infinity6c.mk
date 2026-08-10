@@ -33,8 +33,13 @@ SOC_FPU    := NEON_VFPV4
 # 128MB is what SSC377DE carries. In-package, so a board cannot choose it.
 SOC_RAM_MB := 128
 
-# No SOC_UBOOT_*: this vendor keeps its bootloader on the chip and does not use
-# BR2_TARGET_UBOOT.
+# No SOC_UBOOT_NOR/NAND: this vendor does not use BR2_TARGET_UBOOT. It does
+# build a bootloader, though -- sigmastar-uboot produces a NOR boot image and
+# installs it under this name, so U_BOOT_BIN has to point at what exists rather
+# than at Buildroot's u-boot-with-spl-lzma.bin default. Left unset, pack looks
+# for a file nothing produces and falls through to `uboot-dirclean`, a target
+# Buildroot does not define when BR2_TARGET_UBOOT is off.
+SOC_UBOOT_BIN := u-boot-$(SOC_MODEL)-nor.bin
 
 # 5.10, not the 4.9 the other two families run. thingino.mk sets 4.9 for this
 # vendor before including these files, so this overrides it. It names an output
