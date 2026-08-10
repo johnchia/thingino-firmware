@@ -1,4 +1,4 @@
-# NAME: Unbranded SSC377DE (Infinity6C, SC430AI)
+# NAME: Unbranded SSC377DE (Infinity6C, IMX335)
 #
 # First Infinity6C target. Bring-up only: it exists to prove the family builds
 # -- kernel, vendor modules and vendor userspace -- not to stream. See
@@ -19,12 +19,18 @@
 BR2_SOC_VENDOR_SIGMASTAR=y
 BR2_SIGMASTAR_SOC_MODEL="ssc377de"
 
-# One of the two sensors the vendor ships tuning for on this chip. There is no
-# sc430ai driver in sensor-src -- upstream carries gc4653, os04a10, sc401ai,
-# sc4336p, sc450ai, sc501ai, sc830ai, sc850sl and symlinks imx335/imx415 -- so
-# this selects the IQ blob without a matching module. Fine for a build; a
-# streaming target needs one or the other changed.
-BR2_SENSOR_1_NAME="sc430ai"
+# The driver is present and builds: infinity6c/sensor-src/sensor_imx335_mipi.c.
+#
+# The tuning is not. The family ships sensor-iq/{imx307,sc430ai}.bin and no
+# imx335.bin, so this installs a module without a blob -- the inverse of the
+# sc430ai this target used to select, which had the blob and no module. Of the
+# two that is the better half to have: the sensor is driven either way, and a
+# missing bin costs colour accuracy, not capture. sigmastar-sdk warns and skips
+# the install rather than failing.
+#
+# Point BR2_SENSOR_1_IQ_FILE at a blob when one turns up; it overrides the
+# family bin and needs no change here.
+BR2_SENSOR_1_NAME="imx335"
 
 FLASH_SIZE_MB=8
 

@@ -18,7 +18,7 @@
 SIGMASTAR_SDK_SITE_METHOD = git
 SIGMASTAR_SDK_SITE = https://github.com/johnchia/sigmastar-sdk
 SIGMASTAR_SDK_SITE_BRANCH = main
-SIGMASTAR_SDK_VERSION = c338177056b82773b33e92339818e1dbc51f253f
+SIGMASTAR_SDK_VERSION = f4e4a36c91cdd143a0803b87217ffbb15d26644d
 SIGMASTAR_SDK_LICENSE = PROPRIETARY (mi modules), GPL-2.0 (sensor drivers)
 SIGMASTAR_SDK_REDISTRIBUTE = NO
 
@@ -120,10 +120,16 @@ define SIGMASTAR_SDK_INSTALL_TARGET_CMDS
 		   [ -f "$(SIGMASTAR_SDK_IQ_OVERRIDE)" ]; then \
 			$(INSTALL) -D -m 644 $(SIGMASTAR_SDK_IQ_OVERRIDE) \
 				$(TARGET_DIR)/usr/share/sensor/$(SENSOR_1_MODEL).bin; \
-		else \
+		elif [ -f "$(SIGMASTAR_SDK_FAMILY)/sensor-iq/$(SENSOR_1_MODEL).bin" ]; then \
 			$(INSTALL) -D -m 644 \
 				$(SIGMASTAR_SDK_FAMILY)/sensor-iq/$(SENSOR_1_MODEL).bin \
 				$(TARGET_DIR)/usr/share/sensor/$(SENSOR_1_MODEL).bin; \
+		else \
+			echo "WARNING: sigmastar-sdk: no IQ tuning for $(SENSOR_1_MODEL) on"\
+			     "$(SOC_FAMILY). The sensor is driven, but the ISP falls back to"\
+			     "generic tuning and colour will be visibly wrong. Supply one via"\
+			     "BR2_SENSOR_1_IQ_FILE, or add"\
+			     "$(SOC_FAMILY)/sensor-iq/$(SENSOR_1_MODEL).bin to sigmastar-sdk."; \
 		fi; \
 		echo $(SENSOR_1_MODEL) > $(TARGET_DIR)/usr/share/sensor/model; \
 	fi
