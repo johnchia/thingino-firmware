@@ -55,7 +55,7 @@ BR2_LINUX_KERNEL_CUSTOM_GIT=y
 BR2_LINUX_KERNEL_CUSTOM_REPO_URL="https://github.com/johnchia/linux"
 BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="d85ef37e8ed2367db6b4b9a58d959d598d5cc130"
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
-BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/infinity6e-ssc012b.config"
+BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/kernel/$(KERNEL_VERSION)/ssc012b.config"
 
 # This board's own patch directory, named explicitly so core.fragment's Ingenic
 # one can never apply here. The Sun/Solaris section flags binutils 2.42+ rejects
