@@ -66,9 +66,21 @@ define SIGMASTAR_UBOOT_CONFIGURE_CMDS
 		$(SIGMASTAR_UBOOT_SOC_FAMILY)_defconfig
 endef
 
+# -std=gnu11 because this tree predates C23 and GCC 16 defaults to it. Its
+# include/fwfs.h carries
+#
+#     #ifndef bool
+#     typedef unsigned char       bool;
+#     #endif
+#
+# which guards against bool being a *macro* from stdbool.h. Under C23 it is a
+# keyword instead, so the guard passes and the typedef is rejected. Infinity6C
+# is where this surfaces -- infinity6c_defconfig builds fs/firmwarefs and the
+# Infinity6E one does not -- but the flag is set for every family, since it
+# describes the age of the source rather than anything about a chip.
 define SIGMASTAR_UBOOT_BUILD_CMDS
 	$(SIGMASTAR_UBOOT_MAKE_ENV) $(MAKE) -C $(@D) \
-		KCFLAGS=-DPRODUCT_SOC=$(SIGMASTAR_UBOOT_SOC_MODEL)
+		KCFLAGS="-DPRODUCT_SOC=$(SIGMASTAR_UBOOT_SOC_MODEL) -std=gnu11"
 	cd $(@D) && $(SHELL) make_boot_spinor.sh $(SIGMASTAR_UBOOT_SOC_FAMILY)
 endef
 

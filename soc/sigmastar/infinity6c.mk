@@ -7,9 +7,28 @@ SOC_FAMILY := infinity6c
 # several families; here the family is the finest split that exists, so the two
 # coincide.
 SOC_ARCH   := infinity6c
-# Cortex-A35, not the A7 the other two families run. ARMv8-A executing aarch32,
-# so the same arm-linux-gnueabihf toolchain builds for it.
-SOC_CPU    := cortex_a35
+
+# ARMv7-A, like the other two families, and this is measured rather than
+# inferred from the part number. OpenIPC's ssc377de defconfig says
+# BR2_cortex_a35, which disagrees with every artifact that has to run here:
+#
+#   vendor mi_sys.ko      Tag_CPU_name "7-A"  Tag_CPU_arch v7  FP VFPv2
+#   vendor libmi_sys.so   Tag_CPU_name "7-A"  Tag_CPU_arch v7  FP VFPv4
+#                         Tag_Advanced_SIMD_arch NEONv1 with Fused-MAC
+#   OpenIPC's own mi.ko   Tag_CPU_name "7-A"  Tag_CPU_arch v7
+#   kernel config         CONFIG_CPU_V7=y, VFPv3, NEON -- no CPU_V8, in both
+#                         OpenIPC's tree and the vendor SDK's own
+#   module vermagic       "5.10.61 preempt mod_unload ARMv7 thumb2 p2v8"
+#
+# The libraries' VFPv4 plus NEONv1-with-Fused-MAC is exactly cortex-a7 with
+# neon-vfpv4, which is what we link against, so matching it is not a
+# conservative choice but the correct one.
+#
+# Building as cortex_a35 makes GCC report __ARM_ARCH 8, which is enough for
+# mbedTLS to select its ARMv8 AES path and then fail to inline vaesdq_u8 --
+# an ARMv8 instruction this stack never uses.
+SOC_CPU    := cortex_a7
+SOC_FPU    := NEON_VFPV4
 
 # 128MB is what SSC377DE carries. In-package, so a board cannot choose it.
 SOC_RAM_MB := 128

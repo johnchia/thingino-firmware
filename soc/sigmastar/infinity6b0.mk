@@ -10,6 +10,8 @@ SOC_FAMILY := infinity6b0
 SOC_ARCH   := infinity6b0
 # Cortex-A7. Reaches .config as BR2_$(SOC_CPU) through soc-sigmastar.fragment.
 SOC_CPU    := cortex_a7
+# ARMv7-A, so the VFPv4 NEON unit.
+SOC_FPU    := NEON_VFPV4
 
 # The DRAM is inside the SoC package, so a board cannot choose it. The 64MB
 # tier is what SSC333 ships; see the mma_heap carveout in package/sigmastar-uboot.

@@ -9,6 +9,8 @@ SOC_FAMILY := infinity6e
 SOC_ARCH   := infinity6e
 # Cortex-A7. Reaches .config as BR2_$(SOC_CPU) through soc-sigmastar.fragment.
 SOC_CPU    := cortex_a7
+# ARMv7-A, so the VFPv4 NEON unit.
+SOC_FPU    := NEON_VFPV4
 
 # The DRAM is inside the SoC package, so a board cannot choose it. Reaches
 # .config as BR2_SOC_RAM_MB, whose only consumers are the Ingenic ISP module's

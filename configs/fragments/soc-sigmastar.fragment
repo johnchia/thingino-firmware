@@ -2,7 +2,11 @@ BR2_arm=y
 # Not every SigmaStar family is the same core: Infinity6E and Infinity6B0 are
 # Cortex-A7, Infinity6C is Cortex-A35. soc/sigmastar/<family>.mk names it.
 BR2_$(SOC_CPU)=y
-BR2_ARM_FPU_NEON_VFPV4=y
+# Has to track the CPU. neon-vfpv4 is an ARMv7 FPU; pairing it with an ARMv8-A
+# core leaves GCC reporting __ARM_ARCH 8 while refusing the instructions that
+# implies, which surfaces far away -- mbedTLS enables its ARMv8 AES path and
+# then fails to inline vaesdq_u8 with "target specific option mismatch".
+BR2_ARM_FPU_$(SOC_FPU)=y
 BR2_ARM_INSTRUCTIONS_THUMB2=y
 
 # BR2_SOC_VENDOR_SIGMASTAR is declared in the camera defconfig, not here.

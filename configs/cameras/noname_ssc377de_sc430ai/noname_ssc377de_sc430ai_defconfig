@@ -49,16 +49,56 @@ BR2_TOOLCHAIN_EXTERNAL_CXX=y
 # the kernel are the supported direction.
 BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_9=y
 
-# Vendor U-Boot stays on the chip. No BR2_PACKAGE_SIGMASTAR_UBOOT either: that
-# package builds an Infinity6E NOR image and has no 6C board.
+# Build U-Boot. The package is already family-generic -- it configures
+# $(SOC_FAMILY)_defconfig and passes the model as -DPRODUCT_SOC -- and OpenIPC's
+# tree carries everything this family needs: infinity6c_defconfig, an
+# ipl/infinity6c/ with IPL.bin, IPL_CUST.bin and GCIS.bin, a make_boot_spinor.sh
+# branch that places GCIS at 36k for 6c rather than MXP_SF at 60k, and ssc377de
+# among the SoCs its build.sh iterates. So no package change was needed.
+#
+# Producing BOOT.bin is not flashing it: the boot partition is the one place on
+# this board where a bad write cannot be undone in software.
+BR2_PACKAGE_SIGMASTAR_UBOOT=y
+
 BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/post-image.sh"
 
-# Gates the camera stack in Config.soc.in. Left unset, the streamer choice
-# quietly defaults to None with nothing in the log to say why -- which is what
-# this target wants, but state it rather than get it by accident.
+# Gates the camera stack in Config.soc.in.
 BR2_THINGINO_DEV_IPCAM=y
 
+# No streamer, explicitly. thingino-streamer/Config.in defaults the choice to
+# Raptor for any camera device, so declaring DEV_IPCAM above is enough to pull
+# in raptor, raptor-common and raptor-hal without asking.
+#
+# raptor-hal has no backend for this family and says so:
+#
+#   Invalid PLATFORM=INFINITY6C. Valid: T10 T20 T21 T23 T30 T31 T32 T33 T40
+#   T41 INFINITY6E INFINITY6B0.
+#
+# which is a fact about raptor, not about this port. Adding INFINITY6C there is
+# raptor's to do; until then a streamer cannot be built for this family and
+# selecting one only hides whether the rest of it works.
+BR2_PACKAGE_THINGINO_STREAMER_NONE=y
+
 BR2_PACKAGE_DROPBEAR=y
+
+# No VPN, and the reason is a build failure rather than a preference.
+#
+# core-sigmastar.fragment selects WireGuard, and thingino-vpn/Config.in then
+# selects wireguard-linux-compat "if BR2_LINUX_KERNEL && !KERNEL_VERSION_7".
+# WireGuard has been in mainline since 5.6, so on this family's 5.10 kernel the
+# out-of-tree compat module is both unnecessary and does not compile.
+#
+# KERNEL_VERSION_7 is not a declared Kconfig symbol -- it is used in seven
+# places and defined in none, so it always reads n and the guard always fires.
+# On Ingenic's 3.10/4.4/4.9 kernels selecting the module is the right answer
+# anyway, which is why nothing has caught it; 5.10 is the first kernel where it
+# is wrong.
+#
+# A select cannot be declined by a defconfig, so the choice moves to None
+# rather than the compat package being switched off. Fixing the guard properly
+# means touching Kconfig that every Ingenic target reads, which is a change
+# worth making on its own with its own verification.
+BR2_PACKAGE_THINGINO_VPN_NONE=y
 
 # See the Infinity6E target: the external toolchain's bundled libz is not copied
 # into the target, so anything linking -lz needs a real target zlib.
