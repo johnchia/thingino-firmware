@@ -1,40 +1,49 @@
 # Kernel patches — Infinity6C
 
-The directory has to exist regardless of contents: `core-sigmastar.fragment`
-sets `BR2_LINUX_KERNEL_PATCH` for every SigmaStar family, and `linux.mk` errors
-on a path that is neither a file nor a directory.
+None. The directory has to exist regardless: `core-sigmastar.fragment` sets
+`BR2_LINUX_KERNEL_PATCH` for every SigmaStar family, and `linux.mk` errors on a
+path that is neither a file nor a directory.
 
-## 0001 — armthumb BCJ filter
+## Do not add the armthumb BCJ patch here
 
-Same patch as Infinity6E and Infinity6B0, applied unchanged. This family meets
-its preconditions exactly:
+Infinity6E and Infinity6B0 carry `0001-xz-use-the-armthumb-bcj-filter-on-thumb2-kernels.patch`.
+It does not belong on this family, and adding it is worse than useless.
 
-    CONFIG_KERNEL_XZ=y
-    CONFIG_THUMB2_KERNEL=y
+Those families wrap a **zImage** — `uImage` is `zImage` plus a 64-byte header,
+`-C none`, and the kernel decompresses itself. `scripts/xz_wrap.sh` and
+`lib/decompress_unxz.c` are both live on that path.
 
-`scripts/xz_wrap.sh` picks the BCJ filter from `SRCARCH` alone, so any ARM
-target gets `--arm`, which rewrites A32 branches. A Thumb-2 kernel is T32, so
-that filter matches almost nothing while still disturbing the entropy model.
-`lib/decompress_unxz.c` then has to agree, because it compiles in exactly one
-BCJ decoder.
+Infinity6C does not. OpenIPC's `3473bad24` rewrites the rule in
+`arch/arm/boot/Makefile` to compress `Image` directly:
 
-It applies to 5.10 with no change from the 4.9 version -- both files carry
-identical context in the two trees.
+    xz -z -k -f $(obj)/Image
+    ${MKIMAGE_BIN} ... -C lzma -d $(obj)/Image.xz $(obj)/uImage
 
-This was originally recorded here as *not needed*, on the grounds that the
-`CONFIG_XZ_DEC_*` symbols left unset in `ssc377de.config` govern only the
-runtime XZ decoder used by squashfs. That is true and irrelevant: the patch
-changes a `#define` inside `lib/decompress_unxz.c` selected by `#ifdef
-CONFIG_ARM`, which no Kconfig XZ symbol reaches.
+`xz_wrap.sh` is never called, so the patch cannot reach the shipped image, and
+**u-boot** does the decompressing, not the kernel — so `decompress_unxz.c` is
+not involved either.
 
-Nothing here is a correctness fix. Compressor and decompressor agree either
-way, so an unpatched kernel boots -- it is just larger, which matters because
-the kernel partition is 2048k and the unpatched image leaves 63,960 bytes spare.
+That matters because u-boot cannot decode a BCJ-filtered stream. It ships no
+`lib/xz/xz_dec_bcj.c`, every `XZ_DEC_*` filter is commented out in
+`lib/xz/xz_config.h`, and no BCJ symbol is linked into the binary. A filtered
+stream fails the `Filter ID = LZMA2` test in `xz_dec_stream.c`.
+
+And it fails **silently**. In `common/bootm.c` the `IH_COMP_LZMA` case — which
+SigmaStar redefined to mean XZ, so the `-C lzma` label is deliberate — has its
+error check commented out, and never sets `*load_end`. u-boot prints a return
+code and boots whatever is at the load address. No `BOOTM_ERR_RESET`, unlike
+every neighbouring case.
+
+So: filtering the stream to save ~55KB bricks the board with no diagnostic.
+Doing it needs `xz_dec_bcj.c` added to u-boot first.
+
+Also note `xz_wrap.sh`'s `lc=1,pb=0` tuning is matched to BCJ output. Applied
+here without the filter it *costs* ~32KB against plain `xz -z`.
 
 ## Anything else
 
 The kernel is pinned to OpenIPC's `sigmastar-infinity6c` branch, which already
-carries seven fixes above the BSP import -- lzma uImage, spinand probe-on-type,
+carries seven fixes above the BSP import — lzma uImage, spinand probe-on-type,
 mtdparts identifier, watchdog magic close, python3 scripts, i2c warnings,
 regulatory defaults. A new patch here should be something that branch does not
 already have.
