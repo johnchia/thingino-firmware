@@ -57,7 +57,7 @@ BR2_LINUX_KERNEL_CUSTOM_GIT=y
 BR2_LINUX_KERNEL_CUSTOM_REPO_URL="$(KERNEL_SITE)"
 BR2_LINUX_KERNEL_CUSTOM_REPO_VERSION="$(KERNEL_HASH)"
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
-BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/kernel/$(KERNEL_VERSION)/$(SOC_MODEL).config"
+BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/$(SOC_FAMILY)/kernel/$(KERNEL_VERSION)/$(SOC_FAMILY).config"
 
 # This vendor's own patch directory, per family, named explicitly so
 # core.fragment's Ingenic one can never apply here. Infinity6E needs no patch
