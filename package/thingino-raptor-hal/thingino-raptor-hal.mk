@@ -38,7 +38,7 @@ endef
 # See the matching block in thingino-raptor.mk for why the SigmaStar source
 # override lives at the bottom of the file rather than beside the pinned hash.
 ifeq ($(BR2_SOC_VENDOR_SIGMASTAR),y)
-THINGINO_RAPTOR_HAL_VERSION = a2dccc17eaec7589d90befb3da729f2f1aa934cb
+THINGINO_RAPTOR_HAL_VERSION = 771ee0c51587b2590595d980ff09c5193822d682
 THINGINO_RAPTOR_HAL_SITE = https://github.com/johnchia/raptor-hal
 endif
 
