@@ -1070,7 +1070,27 @@ $(OUTPUT_DIR)/.config:
 	@$(TEAL) "$@"
 	$(MAKE) force-config
 
-ifeq ($(BR2_PACKAGE_THINGINO_KOPT_MMC0_BOOT),y)
+ifeq ($(SOC_VENDOR),sigmastar)
+# board/sigmastar/post-image.sh owns this vendor's NOR layout end to end: it
+# sizes the kernel and rootfs partitions to the images actually built, writes
+# the environment describing them, and assembles the firmware image.
+#
+# It is named by BR2_ROOTFS_POST_IMAGE_SCRIPT, which never fires it. Buildroot
+# runs post-image scripts from target-post-image, reachable only via world/all;
+# we invoke rootfs-squashfs directly, so the hook has never once executed. Left
+# to the generic SFC path below, a SigmaStar board gets an Ingenic environment:
+# jz_sfc mtdparts the kernel cannot match, env at the wrong offset for the
+# bootloader's CONFIG_ENV_OFFSET, and no LX_MEM/mma_heap carveout.
+#
+# The script writes u-boot-env.bin and $(FIRMWARE_NAME_FULL) itself, so neither
+# $(UB_ENV_BIN) nor the assembly below is a prerequisite here.
+$(FIRMWARE_BIN_FULL): $(U_BOOT_BIN) $(KERNEL_BIN) $(ROOTFS_BIN)
+	@$(TEAL) "$@"
+	CAMERA=$(CAMERA) SOC_MODEL=$(SOC_MODEL) FLASH_SIZE_MB=$(FLASH_SIZE_MB) \
+	HOST_DIR=$(HOST_DIR) \
+	$(BR2_EXTERNAL)/board/sigmastar/post-image.sh $(OUTPUT_DIR)/images
+
+else ifeq ($(BR2_PACKAGE_THINGINO_KOPT_MMC0_BOOT),y)
 # MMC SD card image layout:
 #   Block 0:      INGE header (total size + descriptor terminator)
 #   Block 1-33:   Reserved
