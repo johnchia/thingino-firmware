@@ -1,4 +1,4 @@
-# NAME: Unbranded SSC377DE (Infinity6C, IMX335)
+# NAME: Unbranded SSC377QE (Infinity6C, IMX335)
 #
 # First Infinity6C target. See board/sigmastar/infinity6c/ and sigmastar-sdk's
 # infinity6c/PROVENANCE.
@@ -17,7 +17,7 @@
 # fragments are appended to .config, never included as makefiles, so a symbol
 # set only in a fragment is invisible to thingino.mk's vendor dispatch.
 BR2_SOC_VENDOR_SIGMASTAR=y
-BR2_SIGMASTAR_SOC_MODEL="ssc377de"
+BR2_SIGMASTAR_SOC_MODEL="ssc377qe"
 
 # The driver is present and builds: infinity6c/sensor-src/sensor_imx335_mipi.c.
 #

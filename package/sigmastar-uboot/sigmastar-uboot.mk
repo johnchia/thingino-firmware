@@ -13,9 +13,14 @@
 # produces a board that does not boot and cannot be recovered over the network.
 #
 # The SoC model reaches the compiler as a define rather than a defconfig: one
-# defconfig covers the whole family and PRODUCT_SOC selects the DDR timing and
-# pinmux within it. Both values come from the camera defconfig, so a second
-# SigmaStar board needs no change here.
+# defconfig covers the whole family. PRODUCT_SOC does NOT select DDR timing --
+# it is stringified into the "soc=" environment variable and used only to build
+# TFTP filenames (u-boot-${soc}-nor.bin, uImage.${soc}); see
+# include/configs/sstar-common.h. DDR init lives in the IPL/GCIS blobs, which
+# are per family, not per part: make_boot_spinor.sh takes the family and there
+# is one ipl/infinity6c/ set. Upstream's build.sh iterates ssc377 ssc377d
+# ssc377de ssc377qe ssc378de ssc378qe over that single build, so the bootloader
+# binary differs between those parts in name only.
 #
 # Building this does not flash it, and nothing in the image references it. The
 # boot partition is the only one on this board where a bad write cannot be
