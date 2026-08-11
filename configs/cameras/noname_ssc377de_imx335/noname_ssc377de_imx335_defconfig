@@ -1,12 +1,12 @@
 # NAME: Unbranded SSC377DE (Infinity6C, IMX335)
 #
-# First Infinity6C target. Bring-up only: it exists to prove the family builds
-# -- kernel, vendor modules and vendor userspace -- not to stream. See
-# board/sigmastar/infinity6c/ and sigmastar-sdk's infinity6c/PROVENANCE.
+# First Infinity6C target. See board/sigmastar/infinity6c/ and sigmastar-sdk's
+# infinity6c/PROVENANCE.
 #
-# No streamer. thingino-raptor-hal's SigmaStar backend declares INFINITY6E and
-# INFINITY6B0 only, so selecting raptor here would fail the build on a missing
-# platform rather than tell us anything about the family.
+# Streams, as of raptor-hal e3d7f54: capture and encode only. ISP is not
+# implemented on the infinity6c backend -- no tuning load, no exposure or
+# colour control -- so on this target a bad picture is expected and tells you
+# nothing, while no picture is a real result.
 # FRAG: soc-sigmastar core-sigmastar ssl-mbedtls
 
 # board.mk includes this file as a makefile before thingino.mk runs, so the
@@ -71,19 +71,10 @@ BR2_ROOTFS_POST_IMAGE_SCRIPT="$(BR2_EXTERNAL_THINGINO_PATH)/board/sigmastar/post
 # Gates the camera stack in Config.soc.in.
 BR2_THINGINO_DEV_IPCAM=y
 
-# No streamer, explicitly. thingino-streamer/Config.in defaults the choice to
-# Raptor for any camera device, so declaring DEV_IPCAM above is enough to pull
-# in raptor, raptor-common and raptor-hal without asking.
-#
-# raptor-hal has no backend for this family and says so:
-#
-#   Invalid PLATFORM=INFINITY6C. Valid: T10 T20 T21 T23 T30 T31 T32 T33 T40
-#   T41 INFINITY6E INFINITY6B0.
-#
-# which is a fact about raptor, not about this port. Adding INFINITY6C there is
-# raptor's to do; until then a streamer cannot be built for this family and
-# selecting one only hides whether the rest of it works.
-BR2_PACKAGE_THINGINO_STREAMER_NONE=y
+# Raptor, by default. thingino-streamer/Config.in defaults the choice to Raptor
+# for any camera device, so DEV_IPCAM above pulls in raptor, raptor-common and
+# raptor-hal without a symbol here. INFINITY6C is a raptor-hal platform as of
+# e3d7f54.
 
 BR2_PACKAGE_DROPBEAR=y
 

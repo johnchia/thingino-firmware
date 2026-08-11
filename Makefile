@@ -344,7 +344,20 @@ DATA_BIN_SIZE_ALIGNED = $(shell echo $$((($(DATA_BIN_SIZE) + $(ALIGN_BLOCK) - 1)
 U_BOOT_PARTITION_SIZE := $(shell echo $$(($(U_BOOT_SIZE_KB) * 1024)))
 UB_ENV_PARTITION_SIZE := $(shell echo $$(($(UB_ENV_SIZE_KB) * 1024)))
 BACKUP_PARTITION_SIZE := $(shell echo $$(($(BACKUP_SIZE_KB) * 1024)))
+ifeq ($(SOC_VENDOR),sigmastar)
+# TEMPORARY, for Infinity6C hardware bring-up. The universal 1600KB below is an
+# Ingenic figure and is smaller than this family's kernel, so the generated
+# mtdparts declared a partition the kernel does not fit -- silently, since the
+# overflow check further down only prints. Size it to the kernel instead, which
+# is what board/sigmastar/post-image.sh already does for its own layout; the two
+# disagreeing is the underlying bug.
+#
+# Remove once the 6C kernel is trimmed under 1600KB. DATA takes the difference,
+# so this narrows the overlay.
+KERNEL_PARTITION_SIZE = $(KERNEL_BIN_SIZE_ALIGNED)
+else
 KERNEL_PARTITION_SIZE := 1638400  # 1600KB universal (aligned max kernel: 1581008B)
+endif
 ROOTFS_PARTITION_SIZE = $(ROOTFS_BIN_SIZE_ALIGNED)
 
 export U_BOOT_PARTITION_SIZE
