@@ -58,10 +58,20 @@ set_sensor() {
 	esac
 }
 
+# The module set is per family and the two barely overlap. Infinity6E has
+# mhal, mi_mipitx, mi_divp and mi_vpe; Infinity6C ships none of them and needs
+# mi_vcodec -- which carries the MHAL_* symbols mi_venc links against -- plus
+# mi_isp, mi_scl and mi_aio. 6E's list on 6C leaves mi_venc and the sensor
+# driver with unresolved symbols and nothing streams.
+#
+# The device tree is the only family source that is correct before any module
+# is loaded.
+SOC_COMPAT=$(tr -d '\0' </proc/device-tree/compatible 2>/dev/null)
+
 # Load order is the vendor's and is not arbitrary -- mi_sys owns the buffer
 # pool every later module registers against, and mi_venc wants the ISP
 # firmware path at insmod time.
-insert_ko() {
+insert_ko_infinity6e() {
 	insmod $MODULE/mhal.ko
 	insmod $MODULE/mi_common.ko
 	insmod $MODULE/mi_sys.ko cmdQBufSize=768 logBufSize=256
@@ -76,6 +86,35 @@ insert_ko() {
 	insmod $MODULE/mi_vif.ko
 	insmod $MODULE/mi_vpe.ko
 	insmod $MODULE/mi_venc.ko fw_path=/etc/firmware/chagall.bin
+}
+
+# Order is modules.dep's, verified on an SSC377QE. Two differences worth
+# stating: 6C's mi_sys rejects cmdQBufSize and logBufSize by name, and
+# sensor_config is what publishes the sensor's mode table -- without it the
+# sensor driver inserts cleanly and the HAL still reports no modes.
+insert_ko_infinity6c() {
+	insmod $MODULE/mi_common.ko
+	insmod $MODULE/mi_sys.ko
+	insmod $MODULE/mi_rgn.ko
+	insmod $MODULE/mi_vif.ko
+	insmod $MODULE/mi_sensor.ko
+	insmod $MODULE/mi_isp.ko
+	insmod $MODULE/mi_ldc.ko
+	insmod $MODULE/mi_shadow.ko
+	insmod $MODULE/mi_scl.ko
+	insmod $MODULE/mi_vcodec.ko
+	insmod $MODULE/mi_venc.ko fw_path=/etc/firmware/chagall.bin
+	insmod $MODULE/mi_aio.ko
+	insmod $MODULE/mi_ai.ko
+	insmod $MODULE/mi_ao.ko
+	insmod $MODULE/sensor_config.ko
+}
+
+insert_ko() {
+	case "$SOC_COMPAT" in
+		*infinity6c*) insert_ko_infinity6c ;;
+		*)            insert_ko_infinity6e ;;
+	esac
 
 	# mi_poll registers a chrdev with no class, so devtmpfs does not create
 	# the node for it. Everything else under /dev/mi_* appears on its own.
