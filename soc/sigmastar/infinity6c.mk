@@ -1,6 +1,6 @@
 # SigmaStar Infinity6C family. Included for every board; the filter
 # below is what limits it to this family's models.
-ifneq ($(filter $(SOC_MODEL),ssc377de),)
+ifneq ($(filter $(SOC_MODEL),ssc377 ssc377d ssc377de ssc377qe ssc378de ssc378qe),)
 
 SOC_FAMILY := infinity6c
 # Selects a board/kernel subdirectory. For Ingenic that is an ISA shared by
@@ -9,8 +9,9 @@ SOC_FAMILY := infinity6c
 SOC_ARCH   := infinity6c
 
 # ARMv7-A, like the other two families, and this is measured rather than
-# inferred from the part number. OpenIPC's ssc377de defconfig says
-# BR2_cortex_a35, which disagrees with every artifact that has to run here:
+# inferred from the part number. The vendor datasheet and OpenIPC's ssc377de
+# defconfig both say Cortex-A35, and the die is indeed ARMv8 -- but every
+# artifact that has to run on it was built for v7:
 #
 #   vendor mi_sys.ko      Tag_CPU_name "7-A"  Tag_CPU_arch v7  FP VFPv2
 #   vendor libmi_sys.so   Tag_CPU_name "7-A"  Tag_CPU_arch v7  FP VFPv4
@@ -30,8 +31,27 @@ SOC_ARCH   := infinity6c
 SOC_CPU    := cortex_a7
 SOC_FPU    := NEON_VFPV4
 
-# 128MB is what SSC377DE carries. In-package, so a board cannot choose it.
-SOC_RAM_MB := 128
+# The Maruko family, which differs only in DRAM, encoder ceiling and package:
+#
+#   ssc377     64MB   QFN88    5M@30fps
+#   ssc377d   128MB   QFN88    5M@30fps
+#   ssc377de  128MB   QFN128   5M@30fps
+#   ssc377qe  256MB   QFN128   5M@30fps
+#   ssc378de  128MB   QFN128   8M@25fps
+#   ssc378qe  256MB   QFN128   8M@25fps
+#
+# None of that reaches the kernel config or the bootloader binary, which is why
+# one of each serves the family. RAM is not load-bearing for boot either:
+# post-image.sh writes the carveout as ${memlx}/${memsz} and the bootloader
+# fills those from the DRAM it detects, so an image built for one part boots on
+# any of them.
+SOC_RAM_MB_ssc377   := 64
+SOC_RAM_MB_ssc377d  := 128
+SOC_RAM_MB_ssc377de := 128
+SOC_RAM_MB_ssc377qe := 256
+SOC_RAM_MB_ssc378de := 128
+SOC_RAM_MB_ssc378qe := 256
+SOC_RAM_MB := $(SOC_RAM_MB_$(SOC_MODEL))
 
 # No SOC_UBOOT_NOR/NAND: this vendor does not use BR2_TARGET_UBOOT. It does
 # build a bootloader, though -- sigmastar-uboot produces a NOR boot image and
