@@ -88,10 +88,9 @@ insert_ko_infinity6e() {
 	insmod $MODULE/mi_venc.ko fw_path=/etc/firmware/chagall.bin
 }
 
-# Order is modules.dep's, verified on an SSC377QE. Two differences worth
-# stating: 6C's mi_sys rejects cmdQBufSize and logBufSize by name, and
-# sensor_config is what publishes the sensor's mode table -- without it the
-# sensor driver inserts cleanly and the HAL still reports no modes.
+# Order is modules.dep's, verified on an SSC377QE. 6C's mi_sys rejects
+# cmdQBufSize and logBufSize by name. sensor_config only registers /dev/srcfg
+# and configures nothing until something writes to it.
 insert_ko_infinity6c() {
 	insmod $MODULE/mi_common.ko
 	insmod $MODULE/mi_sys.ko
