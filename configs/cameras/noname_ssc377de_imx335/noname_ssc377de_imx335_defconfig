@@ -32,7 +32,7 @@ BR2_SIGMASTAR_SOC_MODEL="ssc377de"
 # family bin and needs no change here.
 BR2_SENSOR_1_NAME="imx335"
 
-FLASH_SIZE_MB=8
+FLASH_SIZE_MB=16
 
 # Same ARM toolchain the Infinity6E target uses. Nothing in it is 6E-specific:
 # it is a generic arm-thingino-linux-gnueabihf, and Cortex-A35 executes the

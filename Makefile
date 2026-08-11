@@ -352,8 +352,8 @@ ifeq ($(SOC_VENDOR),sigmastar)
 # is what board/sigmastar/post-image.sh already does for its own layout; the two
 # disagreeing is the underlying bug.
 #
-# Remove once the 6C kernel is trimmed under 1600KB. DATA takes the difference,
-# so this narrows the overlay.
+# DATA takes the difference, which is free on a 16MB part and would not be on
+# an 8MB one. Remove once the 6C kernel is trimmed under 1600KB.
 KERNEL_PARTITION_SIZE = $(KERNEL_BIN_SIZE_ALIGNED)
 else
 KERNEL_PARTITION_SIZE := 1638400  # 1600KB universal (aligned max kernel: 1581008B)
