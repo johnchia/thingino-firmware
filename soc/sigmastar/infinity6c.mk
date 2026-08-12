@@ -78,13 +78,15 @@ KERNEL_HASH := d17f67f1f90259dab41b6b6abb28fb64348d83e9
 # The vendor build the prebuilt halves come from -- see infinity6e.mk for why
 # this lives here rather than in either package.
 #
-# glibc rather than uclibc because the toolchain is glibc and these libraries
-# are loaded into our processes. Both variants exist in both repositories; the
-# kernel modules barely differ between them, the userspace libraries genuinely
-# do.
+# uclibc, matching the camera's toolchain: these libraries are loaded into our
+# processes, and every .so in the uclibc flavour carries NEEDED libc.so.0. Both
+# variants exist in both repositories; the kernel modules barely differ between
+# them, the userspace libraries genuinely do. GCC moves with the libc -- the
+# vendor built this drop's uclibc flavour with 9.1.0 and its glibc one with
+# 11.1.0, and only those two pairings exist.
 SIGMASTAR_DROP := 0907
-SIGMASTAR_LIBC := glibc
-SIGMASTAR_GCC  := 11.1.0
+SIGMASTAR_LIBC := uclibc
+SIGMASTAR_GCC  := 9.1.0
 SIGMASTAR_KREL := 5.10.61
 
 endif

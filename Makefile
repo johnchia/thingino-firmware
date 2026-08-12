@@ -326,13 +326,19 @@ FIRMWARE_BIN_FULL := $(OUTPUT_DIR)/images/$(FIRMWARE_NAME_FULL)
 GENERIC_FIRMWARE_BIN_FULL := $(GENERIC_OUTPUT_DIR)/images/$(FIRMWARE_NAME_FULL)
 
 # file sizes
-U_BOOT_BIN_SIZE = $(shell stat -c%s $(U_BOOT_BIN))
-UB_ENV_BIN_SIZE = $(shell stat -c%s $(UB_ENV_BIN))
-KERNEL_BIN_SIZE = $(shell stat -c%s $(KERNEL_BIN))
-ROOTFS_BIN_SIZE = $(shell stat -c%s $(ROOTFS_BIN))
-DATA_BIN_SIZE = $(shell stat -c%s $(DATA_BIN))
+#
+# Absent file means 0, not the empty string. These are recursively expanded and
+# are read before the images exist, and on sigmastar data.jffs2 is never built
+# at all -- post-image.sh owns that vendor's layout. An empty expansion turns
+# the arithmetic below into a shell syntax error and silently drops an argument
+# from save_partition_info.py, which then misreads every later one.
+U_BOOT_BIN_SIZE = $(shell stat -c%s $(U_BOOT_BIN) 2>/dev/null || echo 0)
+UB_ENV_BIN_SIZE = $(shell stat -c%s $(UB_ENV_BIN) 2>/dev/null || echo 0)
+KERNEL_BIN_SIZE = $(shell stat -c%s $(KERNEL_BIN) 2>/dev/null || echo 0)
+ROOTFS_BIN_SIZE = $(shell stat -c%s $(ROOTFS_BIN) 2>/dev/null || echo 0)
+DATA_BIN_SIZE = $(shell stat -c%s $(DATA_BIN) 2>/dev/null || echo 0)
 
-FIRMWARE_BIN_FULL_SIZE = $(shell stat -c%s $(FIRMWARE_BIN_FULL))
+FIRMWARE_BIN_FULL_SIZE = $(shell stat -c%s $(FIRMWARE_BIN_FULL) 2>/dev/null || echo 0)
 
 U_BOOT_BIN_SIZE_ALIGNED = $(shell echo $$((($(U_BOOT_BIN_SIZE) + $(ALIGN_BLOCK) - 1) / $(ALIGN_BLOCK) * $(ALIGN_BLOCK))))
 UB_ENV_BIN_SIZE_ALIGNED = $(shell echo $$((($(UB_ENV_BIN_SIZE) + $(ALIGN_BLOCK) - 1) / $(ALIGN_BLOCK) * $(ALIGN_BLOCK))))

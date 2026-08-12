@@ -1,0 +1,45 @@
+# uClibc-ng sibling of toolchain_infinity6e_glibc_gcc16_defconfig. See that file
+# for why the ARM producer is shaped the way it is; only the C library differs.
+#
+# Needed because the SigmaStar vendor blobs are uClibc-ng builds: every libmi_*.so
+# carries NEEDED libc.so.0, which no glibc rootfs can satisfy.
+BR2_arm=y
+BR2_cortex_a7=y
+BR2_ARM_EABIHF=y
+BR2_ARM_FPU_NEON_VFPV4=y
+BR2_ARM_INSTRUCTIONS_THUMB2=y
+
+BR2_OPTIMIZE_S=y
+
+BR2_GLOBAL_PATCH_DIR="$(BR2_EXTERNAL_THINGINO_PATH)/package/all-patches"
+
+BR2_TOOLCHAIN_BUILDROOT_VENDOR="thingino"
+BR2_TOOLCHAIN_BUILDROOT_UCLIBC=y
+BR2_UCLIBC_INSTALL_UTILS=y
+BR2_TOOLCHAIN_BUILDROOT_WCHAR=y
+BR2_TOOLCHAIN_BUILDROOT_LOCALE=y
+BR2_PTHREAD_DEBUG=y
+
+# Both off by default in uClibc, and both are hard requirements of the vendor
+# blobs: they reference __stack_chk_fail/__stack_chk_guard and
+# backtrace/backtrace_symbols, which are the only symbols in the MI set that a
+# stock uClibc-ng cannot resolve. The Ingenic producers omit these because
+# nothing on those targets needs them.
+BR2_TOOLCHAIN_BUILDROOT_USE_SSP=y
+BR2_UCLIBC_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_THINGINO_PATH)/configs/fragments/uclibc/backtrace.config"
+
+# Both lines required: TOOLCHAIN_BUILD lives inside "if BR2_THINGINO_DEV_PACKAGES".
+BR2_THINGINO_DEV_PACKAGES=y
+BR2_THINGINO_TOOLCHAIN_BUILD=y
+
+# All three lines required to reach 4.9 headers; see the glibc producer.
+BR2_KERNEL_HEADERS_VERSION=y
+BR2_DEFAULT_KERNEL_VERSION="4.9.84"
+BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_4_9=y
+
+BR2_BINUTILS_VERSION_2_45_X=y
+BR2_GCC_VERSION_16_X=y
+BR2_TOOLCHAIN_BUILDROOT_CXX=y
+
+BR2_CCACHE=y
+BR2_CCACHE_USE_BASEDIR=y

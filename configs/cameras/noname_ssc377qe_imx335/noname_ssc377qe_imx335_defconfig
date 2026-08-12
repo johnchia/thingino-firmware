@@ -35,18 +35,33 @@ BR2_SENSOR_1_NAME="imx335"
 FLASH_SIZE_MB=16
 
 # Same ARM toolchain the Infinity6E target uses. Nothing in it is 6E-specific:
-# it is a generic arm-thingino-linux-gnueabihf, and Cortex-A35 executes the
-# same aarch32 code. Re-pointed here because the toolchain fragment is resolved
-# from TYPE/GCC/LIBC alone (Makefile:185), which has no architecture in it, so
-# the file appended is always thingino's mipsel one. The camera defconfig is
-# appended after the fragments, so these win.
+# it is a generic arm-thingino-linux-uclibcgnueabihf, and Cortex-A35 executes
+# the same aarch32 code. Re-pointed here because the toolchain fragment is
+# resolved from TYPE/GCC/LIBC alone (Makefile:185), which has no architecture in
+# it, so the file appended is always thingino's mipsel one. The camera defconfig
+# is appended after the fragments, so these win.
+#
+# uClibc rather than glibc: SigmaStar ships each vendor drop in both flavours,
+# and the set that matches this hardware is the uClibc-ng one -- every
+# libmi_*.so in it carries NEEDED libc.so.0, which no glibc rootfs can satisfy.
+# This line overrides BR2_THINGINO_TOOLCHAIN_LIBC_GLIBC from
+# configs/fragments/core-sigmastar.fragment, read earlier.
+BR2_THINGINO_TOOLCHAIN_LIBC_UCLIBC=y
 BR2_TOOLCHAIN_EXTERNAL_CUSTOM=y
 BR2_TOOLCHAIN_EXTERNAL_DOWNLOAD=y
-BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/johnchia/thingino-firmware/releases/download/toolchain-x86_64/thingino-toolchain-x86_64_infinity6e_glibc_gcc16-linux-arm.tar.gz"
-BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX="arm-thingino-linux-gnueabihf"
-BR2_TOOLCHAIN_EXTERNAL_CUSTOM_GLIBC=y
+BR2_TOOLCHAIN_EXTERNAL_URL="https://github.com/johnchia/thingino-firmware/releases/download/toolchain-x86_64/thingino-toolchain-x86_64_infinity6e_uclibc_gcc16-linux-arm.tar.gz"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_PREFIX="arm-thingino-linux-uclibcgnueabihf"
+BR2_TOOLCHAIN_EXTERNAL_CUSTOM_UCLIBC=y
 BR2_TOOLCHAIN_EXTERNAL_GCC_16=y
 BR2_TOOLCHAIN_EXTERNAL_CXX=y
+BR2_TOOLCHAIN_EXTERNAL_WCHAR=y
+BR2_TOOLCHAIN_EXTERNAL_LOCALE=y
+BR2_TOOLCHAIN_EXTERNAL_HAS_THREADS_DEBUG=y
+# Declared, not chosen: the vendor blobs need __stack_chk_fail, so the producer
+# builds uClibc with SSP, and Buildroot refuses to configure an external
+# toolchain whose SSP support is not stated. Not in the shared uclibc fragment
+# because the Ingenic toolchains it also serves are built without it.
+BR2_TOOLCHAIN_EXTERNAL_HAS_SSP=y
 # BR2_TOOLCHAIN_EXTERNAL_INET_RPC is not set
 
 # The toolchain is built against 4.9 headers, which is what it has regardless of
