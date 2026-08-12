@@ -88,6 +88,21 @@ insert_ko_infinity6e() {
 	insmod $MODULE/mi_venc.ko fw_path=/etc/firmware/chagall.bin
 }
 
+# 6C ships in two shapes. From the 2024-12 drop the whole MI stack is one
+# mi.ko; before that it is nineteen modules whose load order matters. Which one
+# is installed is a build-time choice, but testing for the file keeps this
+# script independent of it.
+#
+# g_ModParamPath and the VENC firmware path both default to /config paths that
+# thingino does not have. vdisp_bufq_depth is the vendor's own value from
+# script/demo.sh.
+insert_ko_infinity6c_mono() {
+	insmod $MODULE/mi.ko \
+		g_ModParamPath=/etc/firmware/modparam.json \
+		vdisp_bufq_depth=4 \
+		drv_codec40_common.fw_load_path=/etc/firmware/chagall.bin
+}
+
 # Order is modules.dep's, verified on an SSC377QE. 6C's mi_sys rejects
 # cmdQBufSize and logBufSize by name. sensor_config only registers /dev/srcfg
 # and configures nothing until something writes to it.
@@ -96,6 +111,11 @@ insert_ko_infinity6e() {
 # carries the vendor's per-object prefix. Without it the driver keeps its
 # compiled-in /config/venc_fw path, finds nothing, and MI_VENC_CreateDev fails.
 insert_ko_infinity6c() {
+	if [ -f $MODULE/mi.ko ]; then
+		insert_ko_infinity6c_mono
+		return
+	fi
+
 	insmod $MODULE/mi_common.ko
 	insmod $MODULE/mi_sys.ko
 	insmod $MODULE/mi_rgn.ko

@@ -82,6 +82,10 @@ export SIGMASTAR_DROP
 export SIGMASTAR_LIBC
 export SIGMASTAR_GCC
 export SIGMASTAR_KREL
+# Read at parse time by sigmastar-sdk, not inside a recipe, so an unexported
+# value does not fail loudly -- it silently builds the sensor drivers a
+# prebuilt drop must not have built over its own.
+export SIGMASTAR_SENSOR
 export SOC_MODEL
 export SOC_MODEL_LESS_Z
 export SOC_RAM_MB
