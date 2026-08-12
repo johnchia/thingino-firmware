@@ -20,13 +20,21 @@ BR2_TOOLCHAIN_BUILDROOT_WCHAR=y
 BR2_TOOLCHAIN_BUILDROOT_LOCALE=y
 BR2_PTHREAD_DEBUG=y
 
-# Both off by default in uClibc, and both are hard requirements of the vendor
-# blobs: they reference __stack_chk_fail/__stack_chk_guard and
-# backtrace/backtrace_symbols, which are the only symbols in the MI set that a
-# stock uClibc-ng cannot resolve. The Ingenic producers omit these because
-# nothing on those targets needs them.
+# Three things the stock uClibc-ng config lacks and the vendor blobs require.
+# The Ingenic producers omit all of them because nothing on those targets needs
+# them.
+#
+# SSP and backtrace supply __stack_chk_fail/__stack_chk_guard and
+# backtrace/backtrace_symbols, which the MI libraries reference directly.
+#
+# GNU hash is the one that actually decides whether the stack runs at all.
+# libcam_os_wrapper.so is linked with --hash-style=gnu only -- it has a
+# .gnu.hash section and no SysV .hash -- so an ldso without
+# LDSO_GNU_HASH_SUPPORT cannot look up anything in it and every symbol it
+# defines reports "can't resolve symbol". It is the first library the HAL
+# dlopens, so the whole pipeline fails at init.
 BR2_TOOLCHAIN_BUILDROOT_USE_SSP=y
-BR2_UCLIBC_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_THINGINO_PATH)/configs/fragments/uclibc/backtrace.config"
+BR2_UCLIBC_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_THINGINO_PATH)/configs/fragments/uclibc/backtrace.config $(BR2_EXTERNAL_THINGINO_PATH)/configs/fragments/uclibc/gnu-hash.config"
 
 # Both lines required: TOOLCHAIN_BUILD lives inside "if BR2_THINGINO_DEV_PACKAGES".
 BR2_THINGINO_DEV_PACKAGES=y
