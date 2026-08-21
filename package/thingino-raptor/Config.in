@@ -138,6 +138,14 @@ config BR2_PACKAGE_THINGINO_RAPTOR_RFS
 	  without ISP/encoder hardware. Reads MP4 containers or raw
 	  Annex B H.264/H.265 files. No HAL dependency.
 
+config BR2_PACKAGE_THINGINO_RAPTOR_RCD
+	bool "RCD (configuration daemon)"
+	default y if BR2_PACKAGE_THINGINO_RAPTOR_FULL
+	help
+	  Owns raptor.conf: validates each edit, writes the file,
+	  and sequences the daemon restarts an edit needs. The web
+	  console reads and changes camera state through it.
+
 config BR2_PACKAGE_THINGINO_RAPTOR_RAC
 	bool "rac (audio record/playback tool)"
 	default y if BR2_PACKAGE_THINGINO_RAPTOR_RAD
