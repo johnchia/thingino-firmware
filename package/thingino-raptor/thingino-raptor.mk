@@ -176,7 +176,9 @@ define THINGINO_RAPTOR_INSTALL_TARGET_CMDS
 		$(TARGET_DIR)/etc/raptor.conf
 
 	# Web pages (editable on device)
-	$(INSTALL) -D -m 0644 $(@D)/rhd/index.html \
+	# rhd serves one static page, at /. The console is it; rhd/index.html
+	# is a demo stub and there is no route that would reach a second file.
+	$(INSTALL) -D -m 0644 $(@D)/rhd/console.html \
 		$(TARGET_DIR)/usr/share/raptor/index.html
 	$(INSTALL) -D -m 0644 $(@D)/rwd/webrtc.html \
 		$(TARGET_DIR)/usr/share/raptor/webrtc.html
