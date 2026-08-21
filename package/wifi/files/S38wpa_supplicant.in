@@ -433,7 +433,7 @@ start() {
 
 	case "$mode" in
 		portal)
-			prescan_for_portal
+			# prescan disabled: it holds wlan0 so the portal AP never starts
 			prepare_portal
 			;;
 		ap) start_access_point ;;
