@@ -64,6 +64,49 @@ export SOC_FAMILY
 export SOC_FAMILY_CAPS
 export SOC_MODEL
 export SOC_MODEL_LESS_Z
+
+# Per-device custom device tree: a single .dts in the camera profile dir
+# replaces the SoC family's stock kernel tree. The thingino-kopt linux
+# extension copies it over the family's kernel dts name before every
+# kernel build (BR2_LINUX_KERNEL_CUSTOM_DTS_DIR is unusable here: it
+# hides behind BR2_LINUX_KERNEL_DTS_SUPPORT, which uImage kernels that
+# build their own dtb never enable).
+CAMERA_DTS_FILE = $(wildcard $(BR2_EXTERNAL)/$(CAMERA_SUBDIR)/$(CAMERA)/*.dts)
+ifeq ($(SOC_FAMILY),t40)
+CAMERA_DTS_DEST = shark
+else ifeq ($(SOC_FAMILY),t41)
+CAMERA_DTS_DEST = marmot
+else ifeq ($(SOC_FAMILY),t32)
+# Only T32's 4.4.94 tree carries arch/mips/boot/dts/ingenic/goat.dts and
+# builds it in (CONFIG_DT_GOAT). The 3.10.14 vendor kernel is board-file
+# based (soc-PRJ007/chip-PRJ007/isvp/Goat) with no dts directory at all,
+# so there is nowhere to put one. That is a normal configuration, not a
+# broken profile: the same board dir serves both kernels.
+ifeq ($(KERNEL_VERSION_4),y)
+CAMERA_DTS_DEST = goat
+else
+CAMERA_DTS_NO_TREE = the t32 3.10.14 kernel is board-file based and has no dts tree
+endif
+else ifeq ($(SOC_FAMILY),a1)
+CAMERA_DTS_DEST = tucana
+endif
+ifneq ($(CAMERA_DTS_FILE),)
+ifneq ($(words $(CAMERA_DTS_FILE)),1)
+$(error Camera profile $(CAMERA) has more than one .dts file: $(CAMERA_DTS_FILE))
+endif
+ifeq ($(CAMERA_DTS_DEST),)
+ifneq ($(CAMERA_DTS_NO_TREE),)
+# Known family, but this kernel has no dts tree. Drop the file so the
+# kopt pre-build hook never registers, and carry on.
+$(warning Camera profile $(CAMERA): ignoring $(notdir $(CAMERA_DTS_FILE)) - $(CAMERA_DTS_NO_TREE))
+CAMERA_DTS_FILE =
+else
+$(error Camera profile $(CAMERA) ships a .dts but SoC family '$(SOC_FAMILY)' has no known kernel dts name)
+endif
+endif
+endif
+export CAMERA_DTS_FILE
+export CAMERA_DTS_DEST
 export SOC_RAM_MB
 export SOC_ARCH
 export SOC_TARGET_ARCH
@@ -124,7 +167,7 @@ else ifeq ($(SOC_FAMILY),t32)
 else ifeq ($(SOC_FAMILY),t23)
 	ifeq ($(KERNEL_VERSION),4.4.94)
 		KERNEL_BRANCH := ingenic-t23-4.4.94
-		KERNEL_HASH := b8a1f1ed22272b844fd423871f4aca16e8b779ff
+		KERNEL_HASH := f97f65461547f1543ee3da22e72612f29a797cb3
 	else
 		KERNEL_BRANCH := ingenic-t31
 	endif
@@ -310,7 +353,7 @@ ISP_CLK := $(call resolve_clock_freq,ISP_CLK,isp_clk,\
 
 # ISP_CLKA
 ISP_CLKA_CLK_SRC := $(call resolve_clock_src,ISP_CLKA,clka_name,\
-  SCLKA:sclka INTERNAL:)
+  SCLKA:sclka VPLL:vpll INTERNAL:)
 ISP_CLKA_CLK := $(call resolve_clock_freq,ISP_CLKA,isp_clka,\
   400:400000000 450:450000000 500:500000000 550:550000000 \
   600:600000000 650:650000000 700:700000000)
@@ -321,6 +364,13 @@ ISP_CLKS_CLK_SRC := $(call resolve_clock_src,ISP_CLKS,clks_name,\
 ISP_CLKS_CLK := $(call resolve_clock_freq,ISP_CLKS,isp_clks,\
   400:400000000 450:450000000 500:500000000 550:550000000 \
   600:600000000 650:650000000 700:700000000)
+
+# ISP_CLKV
+ISP_CLKV_CLK_SRC := $(call resolve_clock_src,ISP_CLKV,clkv_name,\
+  SCLKA:sclka VPLL:vpll MPLL:mpll INTERNAL:)
+ISP_CLKV_CLK := $(call resolve_clock_freq,ISP_CLKV,isp_clkv,\
+  400:400000000 450:450000000 500:500000000 550:550000000 \
+  600:600000000)
 
 #
 # ISP configuration parameters
@@ -390,6 +440,8 @@ export ISP_CLKA_CLK_SRC
 export ISP_CLKA_CLK
 export ISP_CLKS_CLK_SRC
 export ISP_CLKS_CLK
+export ISP_CLKV_CLK_SRC
+export ISP_CLKV_CLK
 
 export ISP_MEMOPT
 export ISP_DAY_NIGHT_SWITCH_DROP_FRAME_NUM
@@ -487,7 +539,7 @@ endif
 export UBOOT_FLASH_CONTROLLER
 
 ifeq ($(BR2_TARGET_UBOOT_FORMAT_CUSTOM_NAME),)
-	BR2_TARGET_UBOOT_FORMAT_CUSTOM_NAME := "u-boot-with-spl-lzma.bin"
+	BR2_TARGET_UBOOT_FORMAT_CUSTOM_NAME := "$(or $(SOC_UBOOT_BIN),u-boot-with-spl-lzma.bin)"
 endif
 
 # Whether a camera-named board is worth checking against the U-Boot being

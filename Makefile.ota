@@ -98,7 +98,9 @@ else
 		$(ROOTFS_OFFSET) $(ROOTFS_PARTITION_SIZE) $(ROOTFS_BIN_SIZE) \
 		$(DATA_OFFSET) $(DATA_PARTITION_SIZE) $(DATA_BIN_SIZE) $(DATA_BIN_SIZE_ALIGNED) \
 		$(U_BOOT_SIZE_KB) $(UB_ENV_SIZE_KB) $(BACKUP_SIZE_KB) $(KERNEL_SIZE_KB) $(ROOTFS_SIZE_KB) $(DATA_SIZE_KB) \
-		$(FLASH_SIZE_KB) "$$(( $$(date +%s) - $(THINGINO_BUILD_START_EPOCH) ))" "$$(( ($$($(SCRIPTS_DIR)/disk_sectors_written.sh) - $(THINGINO_BUILD_START_DISK_SECTORS)) * 512 ))" $(UBOOT_FLASH_CONTROLLER) && \
+		$(FLASH_SIZE_KB) "$$(( $$(date +%s) - $(THINGINO_BUILD_START_EPOCH) ))" \
+		"$$(( ($$($(SCRIPTS_DIR)/disk_sectors_written.sh) - $(THINGINO_BUILD_START_DISK_SECTORS)) * 512 ))" \
+		$(UBOOT_FLASH_CONTROLLER) && \
 		cat $(OUTPUT_DIR)/images/$(CAMERA).md
 	@$(ORANGE) "Camera: $(CAMERA)"
 	@$(ORANGE) "Device IP: $(CAMERA_IP_ADDRESS)"
@@ -132,13 +134,6 @@ endif
 			"$$BUILDSCOPE" scan -q --capture etc/thingino.json "$(OUTPUT_DIR)" 2>/dev/null \
 				|| "$$BUILDSCOPE" scan -q "$(OUTPUT_DIR)" || true; \
 		fi
-	@echo ""
-	@ELAPSED=$$(( $$(date +%s) - $(THINGINO_BUILD_START_EPOCH) )); \
-		H=$$((ELAPSED / 3600)); M=$$(((ELAPSED % 3600) / 60)); S=$$((ELAPSED % 60)); \
-		if [ $$H -gt 0 ]; then HMS=$$(printf '%dh %02dm %02ds' $$H $$M $$S); \
-		elif [ $$M -gt 0 ]; then HMS=$$(printf '%dm %02ds' $$M $$S); \
-		else HMS=$$(printf '%ds' $$S); fi; \
-		$(GREEN) "Total build time: $$HMS"
 
 build-info: pack
 	@$(TEAL) "$@"

@@ -7,11 +7,13 @@
     ftp: { photo: true, video: true },
     telegram: { photo: true, video: true },
     gotify: { photo: false, video: false },
+    pushover: { photo: true, video: false },
     mqtt: { photo: true, video: false },
     webhook: { photo: true, video: true },
     storage: { photo: true, video: true },
     ntfy: { photo: true, video: false },
     gphotos: { photo: true, video: true },
+    xmpp: { photo: true, video: false },
   };
 
   const motionEnabledInput = $("#motion_enabled");
@@ -125,11 +127,13 @@
           "ftp",
           "telegram",
           "gotify",
+          "pushover",
           "mqtt",
           "webhook",
           "storage",
           "ntfy",
           "gphotos",
+          "xmpp",
         ];
         services.forEach((service) => {
           const checkbox = $(`#motion_send2${service}`);
@@ -147,11 +151,13 @@
         "ftp",
         "telegram",
         "gotify",
+        "pushover",
         "mqtt",
         "webhook",
         "storage",
         "ntfy",
         "gphotos",
+        "xmpp",
       ];
       services.forEach((service) => {
         const serviceData = data[service];

@@ -7,7 +7,7 @@
 OPENIMP_SITE_METHOD = git
 OPENIMP_SITE = https://github.com/opensensor/openimp
 OPENIMP_SITE_BRANCH = main
-OPENIMP_VERSION = fdb450ce61c16436ec9b8ed32906fc7660075352
+OPENIMP_VERSION = 9cab2192f058c0c5e6c18a6052158a5f7a44b268
 
 # Upstream describes OpenIMP as MIT but does not currently ship a top-level
 # license file for legal-info to collect.
@@ -38,6 +38,14 @@ define OPENIMP_BUILD_CMDS
 		LC_ALL=C \
 		THINGINO_DIR=$(BR2_EXTERNAL_THINGINO_PATH) \
 		TOOLCHAIN_PREFIX=$(OPENIMP_TOOLCHAIN_PREFIX) \
+		T20_OUTPUT_DIR=$(OPENIMP_OUTPUT_DIR) \
+		T20_TARGET_DIR=$(BASE_DIR) \
+		T21_OUTPUT_DIR=$(OPENIMP_OUTPUT_DIR) \
+		T21_TARGET_DIR=$(BASE_DIR) \
+		T23_OUTPUT_DIR=$(OPENIMP_OUTPUT_DIR) \
+		T23_TARGET_DIR=$(BASE_DIR) \
+		T30_OUTPUT_DIR=$(OPENIMP_OUTPUT_DIR) \
+		T30_TARGET_DIR=$(BASE_DIR) \
 		T31_OUTPUT_DIR=$(OPENIMP_OUTPUT_DIR) \
 		T40_OUTPUT_DIR=$(OPENIMP_OUTPUT_DIR) \
 		T40_HEADERS=$(OPENIMP_T40_HEADERS) \
@@ -45,6 +53,15 @@ define OPENIMP_BUILD_CMDS
 		T41_HEADERS=$(OPENIMP_T41_HEADERS) \
 		$(@D)/build-for-device.sh $(OPENIMP_PLATFORM)
 endef
+
+ifeq ($(SOC_FAMILY),t23)
+define OPENIMP_INSTALL_T23_TARGET
+	$(INSTALL) -D -m 0755 $(TARGET_DIR)/usr/lib/libimp.so \
+		$(TARGET_DIR)/opt/openimp-t23/libimp.so
+	$(INSTALL) -D -m 0755 $(OPENIMP_OUTPUT_DIR)/openimp-t23-helixd \
+		$(TARGET_DIR)/opt/openimp-t23/openimp-t23-helixd
+endef
+endif
 
 define OPENIMP_INSTALL_STAGING_CMDS
 	$(INSTALL) -D -m 0755 $(OPENIMP_OUTPUT_DIR)/libimp.so \
@@ -58,6 +75,7 @@ define OPENIMP_INSTALL_STAGING_CMDS
 endef
 
 define OPENIMP_INSTALL_TARGET_CMDS
+	$(OPENIMP_INSTALL_T23_TARGET)
 	$(INSTALL) -D -m 0755 $(OPENIMP_OUTPUT_DIR)/libimp.so \
 		$(TARGET_DIR)/usr/lib/libimp.so
 	$(INSTALL) -D -m 0755 $(OPENIMP_OUTPUT_DIR)/openimp-tuningd \

@@ -29,29 +29,40 @@ endef
 
 define THINGINO_SYSTEM_INSTALL_TARGET_CMDS
 	# Utilities always installed
-	$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/soc \
-		$(TARGET_DIR)/usr/sbin/soc
-
 	$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/firstboot \
 		$(TARGET_DIR)/usr/sbin/firstboot
+	$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/blink \
+		$(TARGET_DIR)/usr/sbin/blink
+	$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/gpio \
+		$(TARGET_DIR)/usr/sbin/gpio
+	$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/led \
+		$(TARGET_DIR)/usr/sbin/led
+	$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/lssdio \
+		$(TARGET_DIR)/usr/sbin/lssdio
+	$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/send2termbin \
+		$(TARGET_DIR)/usr/sbin/send2termbin
+	$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/service \
+		$(TARGET_DIR)/usr/sbin/service
+	$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/timectl \
+		$(TARGET_DIR)/usr/sbin/timectl
+	$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/tzselect \
+		$(TARGET_DIR)/usr/sbin/tzselect
 
 	# Optional utilities
-	if [ "$(BR2_PACKAGE_THINGINO_SYSTEM_USB_ROLE)" = "y" ]; then \
-		$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/usb-role \
-			$(TARGET_DIR)/usr/sbin/usb-role; \
-	fi
-
 	if [ "$(BR2_PACKAGE_THINGINO_SYSTEM_ENTROPY_GENERATOR)" = "y" ]; then \
 		$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/S01entropy \
 			$(TARGET_DIR)/etc/init.d/S01entropy; \
 	fi
 
-	if [ "$(BR2_THINGINO_SDCARD)" = "y" ]; then \
+	if [ "$(BR2_PACKAGE_THINGINO_SYSTEM_AUTOMOUNT)" = "y" ]; then \
 		mkdir -p $(TARGET_DIR)/usr/lib/mdev; \
 		$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/automount \
 			$(TARGET_DIR)/usr/lib/mdev/automount; \
 		$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/S30mdev \
 			$(TARGET_DIR)/etc/init.d/S30mdev; \
+	fi
+
+	if [ "$(BR2_THINGINO_SDCARD)" = "y" ]; then \
 		$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/formatsd \
 			$(TARGET_DIR)/usr/sbin/formatsd; \
 		$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/envfromcard \
@@ -63,9 +74,43 @@ define THINGINO_SYSTEM_INSTALL_TARGET_CMDS
 			$(TARGET_DIR)/etc/init.d/S35swap; \
 	fi
 
-	if [ "$(BR2_PACKAGE_THINGINO_SYSTEM_SENSOR_UTILS)" = "y" ]; then \
-		$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/sensor \
-			$(TARGET_DIR)/usr/sbin/sensor; \
+	# The A1 keeps USB and its disk filesystems out of the kernel image -
+	# nothing mounts a disk or talks USB before userspace, and that is what
+	# lets the kernel fit the 1600 KiB partition. None of it autoloads.
+	# dwc2 is a platform driver behind a modular usbcore, and mdev has no
+	# $$MODALIAS rule, so no USB device is ever probed on its own; it goes
+	# first so the bus exists. /usr/lib/mdev/automount then mounts with
+	# "mount -t auto", which only tries filesystems already listed in
+	# /proc/filesystems, so ext4 and vfat have to be resident before the
+	# first disk appears. modprobe pulls usbcore/usb-common in behind
+	# usb-storage, jbd2/mbcache behind ext4, and fat behind vfat.
+	if [ "$(SOC_FAMILY)" = "a1" ]; then \
+		mkdir -p $(TARGET_DIR)/etc/modules.d; \
+		{ echo "dwc2"; \
+		  echo "ext4"; \
+		  echo "vfat"; \
+		  if [ "$(BR2_PACKAGE_THINGINO_KOPT_USB_MASS_STORAGE)" = "y" ]; then \
+			  echo "usb-storage"; \
+		  fi; \
+		} > $(TARGET_DIR)/etc/modules.d/30-storage; \
+	fi
+
+	# Platform utilities. One block per vendor, each installing out of its own
+	# files/<vendor>/ -- these read SoC registers, so there is nothing shared to
+	# factor out. The optional ones keep the gates they already had.
+	if [ "$(BR2_PACKAGE_THINGINO_SYSTEM_INGENIC)" = "y" ]; then \
+		$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/ingenic/soc \
+			$(TARGET_DIR)/usr/sbin/soc; \
+		$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/ingenic/S03mac \
+			$(TARGET_DIR)/etc/init.d/S03mac; \
+		if [ "$(BR2_PACKAGE_THINGINO_SYSTEM_USB_ROLE)" = "y" ]; then \
+			$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/ingenic/usb-role \
+				$(TARGET_DIR)/usr/sbin/usb-role; \
+		fi; \
+		if [ "$(BR2_PACKAGE_THINGINO_SYSTEM_SENSOR_UTILS)" = "y" ]; then \
+			$(INSTALL) -D -m 0755 $(THINGINO_SYSTEM_PKGDIR)/files/ingenic/sensor \
+				$(TARGET_DIR)/usr/sbin/sensor; \
+		fi; \
 	fi
 endef
 

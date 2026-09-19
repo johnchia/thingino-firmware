@@ -173,10 +173,12 @@
     if (homingEl) {
       homingEl.checked = config.homing === true || config.homing === "true";
     }
-    const posParts =
-      typeof config.pos_0 === "string" ? config.pos_0.split(/\s*,\s*/) : [];
-    setMotorFieldValue("pos_0_x", posParts[0] || "");
-    setMotorFieldValue("pos_0_y", posParts[1] || "");
+    const firstPreset =
+      Array.isArray(config.presets) && config.presets.length
+        ? config.presets[0]
+        : null;
+    setMotorFieldValue("pos_0_x", firstPreset ? firstPreset.x : "");
+    setMotorFieldValue("pos_0_y", firstPreset ? firstPreset.y : "");
     updateHomingInputs();
     motorIsSpi = config.is_spi === true || config.is_spi === "true";
     setMotorPinInputsEnabled(!motorIsSpi);
@@ -442,6 +444,144 @@
   if (motionDriverSelect) {
     motionDriverSelect.addEventListener("change", updateMotionDriverInputs);
   }
+
+  // ------------------------------------------------------------------
+  // PTZ presets
+  // ------------------------------------------------------------------
+  const presetNameInput = $("#ptz-preset-name");
+  const presetSaveButton = $("#ptz-preset-save");
+  const presetsList = $("#ptz-presets-list");
+  const presetsEmpty = $("#ptz-presets-empty");
+
+  function renderPresets(presets) {
+    if (!presetsList) return;
+    presetsList.innerHTML = "";
+    if (presetsEmpty) {
+      presetsEmpty.classList.toggle("d-none", presets.length > 0);
+    }
+    presets.forEach((p) => {
+      const li = document.createElement("li");
+      li.className = "list-group-item d-flex align-items-center gap-2";
+
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.className = "form-control form-control-sm flex-grow-1 preset-name";
+      nameInput.value = p.description || "";
+      nameInput.maxLength = 64;
+      nameInput.placeholder = `Preset ${p.id}`;
+
+      const xInput = document.createElement("input");
+      xInput.type = "number";
+      xInput.className = "form-control form-control-sm preset-x";
+      xInput.style.width = "4.5rem";
+      xInput.value = p.x;
+      xInput.min = "0";
+
+      const yInput = document.createElement("input");
+      yInput.type = "number";
+      yInput.className = "form-control form-control-sm preset-y";
+      yInput.style.width = "4.5rem";
+      yInput.value = p.y;
+      yInput.min = "0";
+
+      const saveBtn = document.createElement("button");
+      saveBtn.type = "button";
+      saveBtn.className = "btn btn-sm btn-outline-success";
+      saveBtn.title = "Save description and coordinates";
+      saveBtn.innerHTML = '<i class="bi bi-check-lg"></i>';
+      saveBtn.addEventListener("click", () => {
+        const description = nameInput.value.trim();
+        if (!description) {
+          showAlert("warning", "Enter a description for the preset.", 3000);
+          return;
+        }
+        const x = xInput.value.trim();
+        const y = yInput.value.trim();
+        if (!/^\d+$/.test(x) || !/^\d+$/.test(y)) {
+          showAlert("warning", "Coordinates must be whole numbers.", 3000);
+          return;
+        }
+        presetAction("pu", { n: p.id, description, x, y });
+      });
+
+      const moveBtn = document.createElement("button");
+      moveBtn.type = "button";
+      moveBtn.className = "btn btn-sm btn-outline-primary";
+      moveBtn.title = "Move to this preset";
+      moveBtn.innerHTML = '<i class="bi bi-play-fill"></i>';
+      moveBtn.addEventListener("click", () => presetAction("pr", { n: p.id }));
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "btn btn-sm btn-outline-danger";
+      delBtn.title = "Delete preset";
+      delBtn.innerHTML = '<i class="bi bi-trash"></i>';
+      delBtn.addEventListener("click", () => presetAction("pd", { n: p.id }));
+
+      li.append(nameInput, xInput, yInput, saveBtn, moveBtn, delBtn);
+      presetsList.appendChild(li);
+    });
+  }
+
+  async function loadPresets() {
+    try {
+      const res = await fetch(
+        "/x/json-motor.cgi?" + new URLSearchParams({ d: "pg" }).toString(),
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json().catch(() => null);
+      if (!payload || payload.result !== "success") {
+        throw new Error(
+          (payload && payload.error && payload.error.message) ||
+            "Failed to load presets",
+        );
+      }
+      renderPresets(
+        payload.message && Array.isArray(payload.message.presets)
+          ? payload.message.presets
+          : [],
+      );
+    } catch (err) {
+      console.error("Failed to load PTZ presets", err);
+    }
+  }
+
+  async function presetAction(action, extra) {
+    try {
+      const params = new URLSearchParams({ d: action });
+      Object.entries(extra || {}).forEach(([k, v]) => params.set(k, v));
+      const res = await fetch("/x/json-motor.cgi?" + params.toString());
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload || payload.result !== "success") {
+        const message = payload && payload.error && payload.error.message;
+        throw new Error(message || `HTTP ${res.status}`);
+      }
+      const status =
+        (payload.message && payload.message.status) || "OK";
+      showAlert("success", status, 3000);
+      await loadPresets();
+    } catch (err) {
+      console.error(`Preset action ${action} failed`, err);
+      showAlert(
+        "danger",
+        `Preset action failed: ${err.message || err}`,
+      );
+    }
+  }
+
+  if (presetSaveButton) {
+    presetSaveButton.addEventListener("click", async () => {
+      const description = (presetNameInput ? presetNameInput.value : "").trim();
+      if (!description) {
+        showAlert("warning", "Enter a description for the preset first.", 3000);
+        return;
+      }
+      await presetAction("ps", { description });
+      if (presetNameInput) presetNameInput.value = "";
+    });
+  }
+
+  loadPresets();
 
   loadMotorsConfig();
 })();

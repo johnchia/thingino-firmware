@@ -37,14 +37,40 @@ CAMERA=atom_cam2_t31x_gc2053_atbm6031 make ram-build   # cold build in tmpfs (RA
 `ram-build` runs the whole output tree on a tmpfs to spare the SSD, then copies
 artifacts back to disk and frees the RAM. It is for **cold builds** only (the
 most disk-write-intensive case); incremental development builds (`make fast`)
-should be done on a real disk. See `docs/makefile.md`.
+should be done on a real disk. See `docs/build/makefile.md`.
 
 - `CAMERA=` can be supplied interactively (uses `scripts/select_camera.sh`).
 - `BOARD=` is an alias for `CAMERA=` (backward compat with CI).
 - `WORKFLOW=1` skips dep check + interactive camera selection (CI use).
 - `PRISTINE=1` disables user directory (`THINGINO_USER_DIR=/dev/null`).
-- Output: `output/<branch>/<camera>-<kernel>-<libc>[-<ip>]/`
-- No test suite. Validation is CI-only.
+- Output: `$(THINGINO_OUTPUT_ROOT_DIR)/<branch>/<camera>-<kernel>-<libc>[-<ip>]/`
+  (`THINGINO_OUTPUT_ROOT_DIR` / `THINGINO_OUTPUT_DIR` override the output root/dir
+  from the environment; default root is `output/`). Always check the env first
+  when looking for build artifacts (`echo $THINGINO_OUTPUT_ROOT_DIR`) — the
+  output tree is usually NOT inside the repo checkout.
+- Download cache: `$(BR2_DL_DIR)` (default `dl/` next to the repo; on this
+  machine `/home/paul/Files/thingino/dl`). Shared across worktrees — never
+  clean it. `make download-cache` bundles it for offline CI builds.
+- User config layer: `$(THINGINO_USER_DIR)` (default `user/` next to the repo;
+  on this machine `/home/paul/.thingino/user`). Per-user/local overrides
+  (`local.fragment`, `local.mk`, `overlay/`, ...); `PRISTINE=1` disables it by
+  pointing it at `/dev/null`. See the config model section below.
+  As with the output dir, read these from the environment
+  (`echo $BR2_DL_DIR $THINGINO_USER_DIR`) before assuming they live in the
+  checkout.
+- No CI-integrated test suite for builds; validation is CI-only. Two QEMU
+  test suites exist, each with its own README:
+  - `scripts/qemu-test/` boots a real image and asserts the network surface
+    (services, portal/provisioning, DHCPv4/v6, DNS, web UI, ONVIF, mDNS,
+    NTP, syslog, link flap, persistence) with Playwright browser flows.
+    Build with `make GROUP=testing CAMERA=qemu_t31x_eth fast`, run with
+    `scripts/qemu-test/run.sh qemu_t31x_eth`. A profile is a directory
+    under `configs/cameras-testing/` with a `qemu-test.json` and its
+    `expected-checks.txt` contract; wifi profiles carry no wired MAC and
+    reach the host over a serial link (the UART0 and SLIP kopts), so never
+    add JZ_MAC to one; add a check by adding one row to the `SUITES`
+    table in `scripts/qemu-test/qemutest/plan.py`.
+  - `scripts/ota-tests/` covers the sysupgrade partition-fitting logic.
 
 ## Repo layout
 
@@ -113,6 +139,8 @@ in menuconfig, or set `BR2_PACKAGE_THINGINO_STREAMER_PRUDYNT=y` /
 
 ## Firmware image
 
+Three flash types are supported:
+
 - **SFC (SPI NOR)**: `boot(320K) + env(64K) + backup(64K) + kernel(1600K) + rootfs.squashfs + data.jffs2`
   The `backup` partition holds a copy of the U-Boot environment for fail-safe updates.
 - **SFC-NAND (SPI NAND)**: UBI image at 1 MiB offset with volumes:
@@ -148,7 +176,7 @@ before editing. Use `make rebuild-<pkg>` after changing overrides.
 - `package/thingino-webui/files/www/a/*.js` → formatted with **Prettier**.
 - Staged `/bin/sh` scripts → formatted with **shfmt** (`shfmt -w -i 0 -ci`).
 - Staged camera defconfigs → sorted with **`scripts/sort_defconfig.py`**
-  (see `docs/pre-commit-hooks.md` for the sort rules).
+  (see `docs/dev/pre-commit-hooks.md` for the sort rules).
 - `.githooks/pre-commit` must be active (`make setup-hooks`).
 - **Shell scripts must be ASCII only.** No Unicode box-drawing, em dashes,
   braille spinners, emoji, or other non-ASCII characters in `.sh` files.
@@ -158,6 +186,16 @@ before editing. Use `make rebuild-<pkg>` after changing overrides.
   supports a subset of POSIX plus some extensions; when in doubt, stick
   to POSIX. `shfmt` parses scripts as POSIX by default — if it flags
   something, fix the script, not the shebang.
+- **Files that ship on cameras carry no story.** Anything installed into
+  the rootfs — webui JS (`package/*/files/www/`), CGI scripts, init
+  scripts, `overlay/`, `board/` shell scripts — ships on a device where
+  nobody reads the source. Keep comments short and only where they
+  explain genuinely non-obvious control flow; a comment that restates
+  the code ("redirect to login") or narrates history ("this was lost
+  from a fork") is noise. The story — why a decision was made, what the
+  old behavior did wrong, benchmark numbers — belongs in the commit
+  message, PR description, or `docs/`, not in the code. Good code
+  should speak for itself.
 
 ## Container Builds
 
@@ -171,7 +209,7 @@ Container engine auto-detects podman → docker fallback.
 
 ## Parallel development (git worktrees)
 
-One task, one branch, one worktree, one agent. See `docs/worktrees.md`.
+One task, one branch, one worktree, one agent. See `docs/dev/worktrees.md`.
 
 ```bash
 scripts/worktree.sh create <branch> [base]   # worktree + buildroot submodule + patches + shared dl
@@ -240,13 +278,13 @@ Always supply `Signed-off-by:` matching the git config when creating patches.
 
 Optional packages can contribute pages, scripts, and navigation items to the
 Thingino Web UI through a build-time manifest system.  See
-[docs/plugin-system.md](docs/plugin-system.md) for the full architecture.
+[docs/dev/plugin-system.md](docs/dev/plugin-system.md) for the full architecture.
 
 ### Quickstart for plugin authors
 
 1. Create your package normally in `package/<name>/`.
 2. Create a manifest at `package/<name>/files/<name>.webui.json` following the
-   schema in `docs/plugin-system.md` §3.
+   schema in `docs/dev/plugin-system.md` §3.
 3. In your package's `.mk`, add the webui dependency:
    ```make
    ifeq ($(BR2_PACKAGE_THINGINO_WEBUI),y)

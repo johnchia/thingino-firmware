@@ -1,4 +1,12 @@
+# Create the user config skeleton (common, per-camera, per-device).
+# Opt-in: run `make user-dirs` or pass USER_DIRS=1 to a build target, so
+# regular builds do not litter the user directory with empty files.
+USER_DIRS ?=
+ifeq (user-dirs,$(filter user-dirs,$(MAKECMDGOALS)))
+USER_DIRS := 1
+endif
 user-dirs:
+ifeq ($(USER_DIRS),1)
 ifneq ($(THINGINO_USER_DIR),/dev/null)
 	$(call create_user_dir,$(THINGINO_USER_COMMON_DIR))
 ifdef THINGINO_USER_CAMERA_DIR
@@ -7,6 +15,9 @@ endif
 ifdef THINGINO_USER_DEVICE_DIR
 	$(call create_user_dir,$(THINGINO_USER_DEVICE_DIR))
 endif
+endif
+else
+	@:
 endif
 
 # Default: fast parallel incremental build
@@ -150,28 +161,27 @@ ram-dev:
 	done
 	@$(GREEN) "Build complete. Tree kept at $(RAM_OUTPUT_DIR) - re-run 'make ram-dev' to resume as needed."
 
-# update repo and submodules with buildroot patch management
+# update repo and submodules (buildroot override patching is intentionally disabled
+# here -- applying patches dirties the submodule and triggers agents; apply them
+# explicitly with `make patch-buildroot` when needed)
 update:
 	@$(TEAL) "$@"
-	@echo "=== UNPATCHING BUILDROOT OVERRIDES ==="
-	@if [ -d "$(BUILDROOT_OVERRIDE_PATCH_DIR)" ]; then \
-		for patch in $$(find "$(BUILDROOT_OVERRIDE_PATCH_DIR)" -maxdepth 1 -type f -name '*.patch' | LC_ALL=C sort -r); do \
-			if git -C "$(BUILDROOT_DIR)" apply -R --check "$$patch"; then \
-				echo "Unapplying $$patch"; \
-				git -C "$(BUILDROOT_DIR)" apply -R "$$patch"; \
-			else \
-				echo "Skipping (not applied): $$patch"; \
-			fi; \
-		done; \
-	else \
-		echo "No buildroot override patch directory: $(BUILDROOT_OVERRIDE_PATCH_DIR)"; \
-	fi
 	@echo "=== UPDATING MAIN REPOSITORY ==="
 	git pull --rebase --autostash
 	@echo "=== UPDATING SUBMODULES ==="
 	git submodule init
 	git submodule update
-	@echo "=== APPLYING BUILDROOT OVERRIDES ==="
+	@echo "=== CHECKING EXTERNAL TOOLCHAIN BUNDLES ==="
+	BR2_DL_DIR=$(BR2_DL_DIR) \
+		$(SCRIPTS_DIR)/update_toolchain_bundles.sh
+	@$(ORANGE) "$(GIT_BRANCH)"
+
+patch-buildroot:
+	@$(TEAL) "$@"
+	@if [ ! -d "$(BUILDROOT_DIR)" ]; then \
+		echo "ERROR: buildroot submodule is not initialized yet"; \
+		exit 1; \
+	fi
 	@if [ -d "$(BUILDROOT_OVERRIDE_PATCH_DIR)" ]; then \
 		for patch in $$(find "$(BUILDROOT_OVERRIDE_PATCH_DIR)" -maxdepth 1 -type f -name '*.patch' | LC_ALL=C sort); do \
 			if git -C "$(BUILDROOT_DIR)" apply --check "$$patch"; then \
@@ -187,10 +197,25 @@ update:
 	else \
 		echo "No buildroot override patch directory: $(BUILDROOT_OVERRIDE_PATCH_DIR)"; \
 	fi
-	@echo "=== CHECKING EXTERNAL TOOLCHAIN BUNDLES ==="
-	BR2_DL_DIR=$(BR2_DL_DIR) \
-		$(SCRIPTS_DIR)/update_toolchain_bundles.sh
-	@$(ORANGE) "$(GIT_BRANCH)"
+
+unpatch-buildroot:
+	@$(TEAL) "$@"
+	@if [ ! -d "$(BUILDROOT_DIR)" ]; then \
+		echo "ERROR: buildroot submodule is not initialized yet"; \
+		exit 1; \
+	fi
+	@if [ -d "$(BUILDROOT_OVERRIDE_PATCH_DIR)" ]; then \
+		for patch in $$(find "$(BUILDROOT_OVERRIDE_PATCH_DIR)" -maxdepth 1 -type f -name '*.patch' | LC_ALL=C sort -r); do \
+			if git -C "$(BUILDROOT_DIR)" apply -R --check "$$patch"; then \
+				echo "Unapplying $$patch"; \
+				git -C "$(BUILDROOT_DIR)" apply -R "$$patch"; \
+			else \
+				echo "Skipping (not applied): $$patch"; \
+			fi; \
+		done; \
+	else \
+		echo "No buildroot override patch directory: $(BUILDROOT_OVERRIDE_PATCH_DIR)"; \
+	fi
 
 update_manual:
 	@echo "=== UPDATING BUILDROOT MANUALS ==="
@@ -340,7 +365,9 @@ endif
 	@echo "# U-Boot board configuration" >> $(OUTPUT_DIR)/.config
 	@echo 'BR2_TARGET_UBOOT_BOARDNAME="$(UBOOT_BOARDNAME)"' >>$(OUTPUT_DIR)/.config
 	@echo 'BR2_TARGET_UBOOT_BOARD_DEFCONFIG="$(UBOOT_DEFCONFIG)"' >>$(OUTPUT_DIR)/.config
-	@echo 'BR2_TARGET_UBOOT_FORMAT_CUSTOM_NAME="$(UBOOT_BIN_NAME)"' >>$(OUTPUT_DIR)/.config
+	@if ! grep -q '^BR2_TARGET_UBOOT_FORMAT_CUSTOM_NAME=' $(OUTPUT_DIR)/.config 2>/dev/null; then \
+		echo 'BR2_TARGET_UBOOT_FORMAT_CUSTOM_NAME="$(UBOOT_BIN_NAME)"' >>$(OUTPUT_DIR)/.config; \
+	fi
 	@echo >>$(OUTPUT_DIR)/.config
 	# Kernel config override: only 3.10.14 uses official kernel.org tarball + patches.
 	# All other versions (4.4.94, 7.1-rc1) use custom git repo from thingino-linux.

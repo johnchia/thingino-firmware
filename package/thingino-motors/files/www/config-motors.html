@@ -146,19 +146,37 @@
                 </p>
                 <div class="d-flex gap-2">
                   <p>
-                    <label for="pos_0_x">Start position X</label>
+                    <label for="pos_0_x">Initial position X</label>
                     <input type="number" class="form-control" id="pos_0_x" name="pos_0_x" placeholder="0">
                   </p>
                   <p>
-                    <label for="pos_0_y">Start position Y</label>
+                    <label for="pos_0_y">Initial position Y</label>
                     <input type="number" class="form-control" id="pos_0_y" name="pos_0_y" placeholder="0">
                   </p>
                 </div>
+                <p class="alert alert-info small">The initial position is the first PTZ preset. Reorder presets below to change it.</p>
                 <a href="#" class="read-motors mb-3 d-block" title="Use current pose">Pick up the recent position</a>
               </div><!-- .col -->
             </div><!-- .row -->
           </div><!-- .card-body -->
         </div><!-- .card -->
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <h2 class="card-title">PTZ Presets</h2>
+            <small>Save the current camera position and recall it with one click.</small>
+          </div>
+          <div class="card-body">
+            <div class="d-flex gap-2 mb-3">
+              <input type="text" class="form-control" id="ptz-preset-name" placeholder="Preset description, e.g. Front door" maxlength="64">
+              <button type="button" class="btn btn-outline-primary text-nowrap" id="ptz-preset-save" title="Save current position as a preset">
+                <i class="bi bi-plus-circle me-1"></i>Save position
+              </button>
+            </div>
+            <ul id="ptz-presets-list" class="list-group"></ul>
+            <small id="ptz-presets-empty" class="text-secondary d-block mt-2">No presets yet. Move the camera (preview overlay) and save a position above.</small>
+          </div>
+        </div>
 
         <button type="submit" id="motors_submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Save changes</button>
       </form>

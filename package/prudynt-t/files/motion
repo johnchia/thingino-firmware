@@ -12,7 +12,7 @@ MOTION_ALARM="/run/motion/motion_alarm"
 MOTION_ALARM_DIR=$(dirname "$MOTION_ALARM")
 [ -d "$MOTION_ALARM_DIR" ] || mkdir -p "$MOTION_ALARM_DIR"
 
-MOTION_STOP_FILE="/run/motors.pid"
+MOTOR_ACTIVE_FLAG="/run/motors-active"
 
 MOTION_VIDEO_CHANNEL=0
 # Duration for motion clips (seconds). Read from config or default to 10.
@@ -35,9 +35,9 @@ set_enabled() {
 
 start() {
 	echo_info "Start motion"
-	if [ -f "$MOTION_STOP_FILE" ]; then
-		echo_error "Motor motion file present. Exiting."
-		exit 1
+	if [ -f "$MOTOR_ACTIVE_FLAG" ]; then
+		echo_info "Motors active; suppressing motion event."
+		exit 0
 	fi
 
 	# Generate timestamp for this motion event
@@ -55,7 +55,7 @@ start() {
 	need_photo=false
 	need_video=false
 
-	for service in email ftp gphotos gotify mqtt ntfy storage telegram webhook; do
+	for service in email ftp gphotos gotify mqtt ntfy pushover storage telegram webhook; do
 		if [ "true" = "$(get_value send2${service})" ]; then
 			[ "true" = "$(jct /etc/send2.json get ${service}.send_photo 2>/dev/null)" ] && need_photo=true
 			[ "true" = "$(jct /etc/send2.json get ${service}.send_video 2>/dev/null)" ] && need_video=true
@@ -154,6 +154,22 @@ start() {
 	if [ "true" = "$(get_value send2gotify)" ]; then
 		echo_info "Send alert to Gotify"
 		MOTION_PHOTO_FILE="$MOTION_PHOTO_FILE" MOTION_VIDEO_FILE="$MOTION_VIDEO_FILE" send2gotify &
+		send2_pids="$send2_pids $!"
+	fi
+
+	if [ "true" = "$(get_value send2pushover)" ]; then
+		echo_info "Send alert to Pushover"
+		MOTION_PHOTO_FILE="$MOTION_PHOTO_FILE" MOTION_VIDEO_FILE="$MOTION_VIDEO_FILE" send2pushover &
+		send2_pids="$send2_pids $!"
+	fi
+
+	if [ "true" = "$(get_value send2xmpp)" ]; then
+		echo_info "Send alert to XMPP"
+		if [ -n "$MOTION_PHOTO_FILE" ] && [ -f "$MOTION_PHOTO_FILE" ]; then
+			send2xmpp -i "$MOTION_PHOTO_FILE" -m "Motion detected on $(hostname) at $(date)" &
+		else
+			send2xmpp -m "Motion detected on $(hostname) at $(date)" &
+		fi
 		send2_pids="$send2_pids $!"
 	fi
 

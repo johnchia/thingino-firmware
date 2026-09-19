@@ -10,6 +10,8 @@ THINGINO_RAPTOR_DEPENDENCIES += thingino-raptor-hal thingino-raptor-ipc thingino
 THINGINO_RAPTOR_DEPENDENCIES += thingino-webui thingino-agent
 ifeq ($(BR2_PACKAGE_OPENIMP),y)
 THINGINO_RAPTOR_DEPENDENCIES += openimp
+endif
+ifeq ($(BR2_PACKAGE_OPENIMP_USE_V4L2),y)
 THINGINO_RAPTOR_MAKE_OPTS += V4L2_OPENIMP=1
 endif
 ifeq ($(BR2_PACKAGE_INGENIC_SYSTEM_LIBS_NEO),y)
@@ -205,10 +207,14 @@ define THINGINO_RAPTOR_INSTALL_TARGET_CMDS
 		$(TARGET_DIR)/var/www/tool-timelapse.html
 	$(INSTALL) -D -m 0644 $(THINGINO_RAPTOR_PKGDIR)/files/www/a/streamer.js \
 		$(TARGET_DIR)/var/www/a/streamer.js
+	$(INSTALL) -D -m 0644 $(THINGINO_RAPTOR_PKGDIR)/files/www/a/preview-endpoints.js \
+		$(TARGET_DIR)/var/www/a/preview-endpoints.js
 	$(INSTALL) -D -m 0644 $(THINGINO_RAPTOR_PKGDIR)/files/www/a/streamer-config.js \
 		$(TARGET_DIR)/var/www/a/streamer-config.js
 	$(INSTALL) -D -m 0644 $(THINGINO_RAPTOR_PKGDIR)/files/www/a/streamer-osd.js \
 		$(TARGET_DIR)/var/www/a/streamer-osd.js
+	$(INSTALL) -D -m 0644 $(THINGINO_RAPTOR_PKGDIR)/files/www/a/streamer-image.js \
+		$(TARGET_DIR)/var/www/a/streamer-image.js
 	$(INSTALL) -D -m 0644 $(THINGINO_RAPTOR_PKGDIR)/files/www/a/audio.js \
 		$(TARGET_DIR)/var/www/a/audio.js
 	$(INSTALL) -D -m 0644 $(THINGINO_RAPTOR_PKGDIR)/files/www/a/tool-timelapse.js \

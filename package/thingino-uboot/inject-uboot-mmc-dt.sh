@@ -24,7 +24,6 @@ set -e
 
 JSON="$1"
 DTS="$2"
-DT="$3"
 BUSW="$4"
 [ -f "$DTS" ] || exit 0
 
@@ -47,6 +46,10 @@ if [ -n "$BUSW" ] && ! grep -q 'bus-width' "$DTS"; then
 			;;
 	esac
 fi
+
+# Everything below reads thingino.json; a board that ships none has nothing
+# left to inject here. (The bus-width injection above is json-independent.)
+[ -f "$JSON" ] || exit 0
 
 # Read gpio.mmc_cd, gpio.mmc_power.{pin,active_low} and gpio.button_reset in one
 # shot. python3 is already a U-Boot build dependency (binman), so this needs no
@@ -122,6 +125,8 @@ if [ "$CD" -ge 0 ] && ! grep -q 'cd-gpios' "$DTS"; then
 	if [ -n "$CB" ]; then
 		{
 			printf '\n&msc0 {\t/* MMC card-detect, board gpio.mmc_cd=%s */\n' "$CD"
+			printf '\tstatus = "okay";\n'
+			printf '\tbus-width = <4>;\n'
 			printf '\t/delete-property/ broken-cd;\n'
 			printf '\tcd-gpios = <&gp%s %s 0x11>;\t/* GPIO_ACTIVE_LOW | GPIO_PULL_UP */\n' "$CB" "$((CD % 32))"
 			printf '};\n'
